@@ -35,6 +35,7 @@ import com.tripbudget.app.data.entity.MemberEntity
 import com.tripbudget.app.domain.ExpenseCategory
 import com.tripbudget.app.domain.Money
 import com.tripbudget.app.domain.PaymentSource
+import com.tripbudget.app.ui.components.DatePickerField
 import com.tripbudget.app.ui.components.MoneyTextField
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
 import java.time.LocalDate
@@ -61,10 +62,9 @@ fun ExpenseEditorDialog(
         mutableStateOf(existing?.let { Money.paiseToRupeesString(it.amountPaise) }.orEmpty())
     }
     var category by remember(existing) { mutableStateOf(existing?.category ?: ExpenseCategory.FOOD) }
-    var dateText by remember(existing) {
+    var date by remember(existing) {
         mutableStateOf(
-            existing?.let { LocalDate.ofEpochDay(it.dateEpochDay).toString() }
-                ?: LocalDate.now().toString(),
+            existing?.let { LocalDate.ofEpochDay(it.dateEpochDay) } ?: LocalDate.now(),
         )
     }
     var paymentSource by remember(existing) {
@@ -74,10 +74,28 @@ fun ExpenseEditorDialog(
         mutableStateOf(existing?.paidByMemberId ?: members.firstOrNull()?.id)
     }
     var notes by remember(existing) { mutableStateOf(existing?.notes.orEmpty()) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var titleError by remember { mutableStateOf<String?>(null) }
+    var amountError by remember { mutableStateOf<String?>(null) }
+    var paidByError by remember { mutableStateOf<String?>(null) }
     var categoryExpanded by remember { mutableStateOf(false) }
     var memberExpanded by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    fun clearFieldErrors() {
+        titleError = null
+        amountError = null
+        paidByError = null
+    }
+
+    fun applySaveError(message: String) {
+        clearFieldErrors()
+        when {
+            message.contains("title", ignoreCase = true) -> titleError = message
+            message.contains("amount", ignoreCase = true) -> amountError = message
+            message.contains("paid", ignoreCase = true) -> paidByError = message
+            else -> amountError = message
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -104,18 +122,26 @@ fun ExpenseEditorDialog(
             )
             OutlinedTextField(
                 value = title,
-                onValueChange = { title = it },
+                onValueChange = {
+                    title = it
+                    titleError = null
+                },
                 label = { Text("Title") },
                 singleLine = true,
+                isError = titleError != null,
+                supportingText = titleError?.let { { Text(it) } },
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
             MoneyTextField(
                 value = amount,
-                onValueChange = { amount = it },
+                onValueChange = {
+                    amount = it
+                    amountError = null
+                },
                 label = "Amount",
-                isError = error != null,
-                supportingText = error,
+                isError = amountError != null,
+                supportingText = amountError,
             )
             ExposedDropdownMenuBox(
                 expanded = categoryExpanded,
@@ -147,13 +173,10 @@ fun ExpenseEditorDialog(
                     }
                 }
             }
-            OutlinedTextField(
-                value = dateText,
-                onValueChange = { dateText = it },
-                label = { Text("Date (YYYY-MM-DD)") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth(),
+            DatePickerField(
+                value = date,
+                onValueChange = { date = it },
+                label = "Date",
             )
             Text("Payment source", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -187,6 +210,8 @@ fun ExpenseEditorDialog(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Who paid") },
+                            isError = paidByError != null,
+                            supportingText = paidByError?.let { { Text(it) } },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(memberExpanded) },
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier
@@ -202,6 +227,7 @@ fun ExpenseEditorDialog(
                                     text = { Text(member.name) },
                                     onClick = {
                                         paidBy = member.id
+                                        paidByError = null
                                         memberExpanded = false
                                     },
                                 )
@@ -221,24 +247,20 @@ fun ExpenseEditorDialog(
             PrimaryCoastalButton(
                 text = "Save expense",
                 onClick = {
-                    val date = runCatching { LocalDate.parse(dateText.trim()) }.getOrNull()
-                    if (date == null) {
-                        error = "Use date format YYYY-MM-DD"
-                        return@PrimaryCoastalButton
-                    }
+                    clearFieldErrors()
                     val memberId = when (paymentSource) {
                         PaymentSource.SHARED -> null
                         PaymentSource.PERSONAL -> {
                             val id = paidBy
                             if (id == null) {
-                                error = "Select who paid"
+                                paidByError = "Select who paid"
                                 return@PrimaryCoastalButton
                             }
                             id
                         }
                     }
                     onSave(title, amount, category, date, memberId, paymentSource, notes) { result ->
-                        if (result == null) onDismiss() else error = result
+                        if (result == null) onDismiss() else applySaveError(result)
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),

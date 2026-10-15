@@ -22,15 +22,16 @@ class MoneyTest {
     }
 
     @Test
-    fun paiseToRupeesString_roundTrips() {
-        assertEquals("100.00", Money.paiseToRupeesString(100_00))
-        assertEquals("0.50", Money.paiseToRupeesString(50))
-        assertEquals("-12.34", Money.paiseToRupeesString(-1234))
+    fun paiseToRupeesString_wholeRupeesOnly() {
+        assertEquals("100", Money.paiseToRupeesString(100_00))
+        assertEquals("1", Money.paiseToRupeesString(50)) // 0.50 rounds to 1
+        assertEquals("-12", Money.paiseToRupeesString(-1234))
     }
 
     @Test
-    fun formatInr_containsCurrencySymbol() {
+    fun formatInr_noDecimals() {
         val formatted = Money.formatInr(150_075)
         assertTrue(formatted.contains("1") || formatted.contains("₹"))
+        assertTrue(!formatted.contains("."))
     }
 }

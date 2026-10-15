@@ -113,6 +113,7 @@ class MembersViewModel(
         memberId: Long,
         amountRupees: String,
         note: String?,
+        paidAt: Long,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
@@ -127,6 +128,7 @@ class MembersViewModel(
                     memberId = memberId,
                     amountPaise = paise,
                     note = note?.trim()?.takeIf { it.isNotEmpty() },
+                    paidAt = paidAt,
                 ),
             )
             onResult(null)
@@ -137,6 +139,7 @@ class MembersViewModel(
         contribution: ContributionEntity,
         amountRupees: String,
         note: String?,
+        paidAt: Long,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
@@ -149,6 +152,7 @@ class MembersViewModel(
                 contribution.copy(
                     amountPaise = paise,
                     note = note?.trim()?.takeIf { it.isNotEmpty() },
+                    paidAt = paidAt,
                 ),
             )
             onResult(null)

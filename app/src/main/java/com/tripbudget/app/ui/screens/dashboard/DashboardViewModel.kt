@@ -57,6 +57,7 @@ class DashboardViewModel(
         memberId: Long,
         amountRupees: String,
         note: String?,
+        paidAt: Long,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
@@ -71,6 +72,7 @@ class DashboardViewModel(
                     memberId = memberId,
                     amountPaise = paise,
                     note = note?.trim()?.takeIf { it.isNotEmpty() },
+                    paidAt = paidAt,
                 ),
             )
             onResult(null)

@@ -5,7 +5,7 @@ import java.math.RoundingMode
 import java.text.NumberFormat
 import java.util.Locale
 
-/** Store and calculate money as integer paise (1 INR = 100 paise). */
+/** Store and calculate money as integer paise (1 INR = 100 paise). Display without decimals. */
 object Money {
     fun rupeesToPaise(rupees: String): Long? {
         val trimmed = rupees.trim()
@@ -23,16 +23,20 @@ object Money {
     }
 
     fun paiseToRupeesString(paise: Long): String {
-        val abs = kotlin.math.abs(paise)
-        val whole = abs / 100
-        val fraction = abs % 100
-        val sign = if (paise < 0) "-" else ""
-        return "$sign$whole.${fraction.toString().padStart(2, '0')}"
+        return BigDecimal(paise)
+            .movePointLeft(2)
+            .setScale(0, RoundingMode.HALF_UP)
+            .toPlainString()
     }
 
     fun formatInr(paise: Long): String {
-        val rupees = BigDecimal(paise).movePointLeft(2)
-        val formatter = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        val rupees = BigDecimal(paise)
+            .movePointLeft(2)
+            .setScale(0, RoundingMode.HALF_UP)
+        val formatter = NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
+            maximumFractionDigits = 0
+            minimumFractionDigits = 0
+        }
         return formatter.format(rupees)
     }
 }

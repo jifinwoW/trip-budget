@@ -1,6 +1,7 @@
 package com.tripbudget.app.ui.screens.members
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,18 +12,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -38,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tripbudget.app.data.entity.ContributionEntity
@@ -59,7 +63,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MembersScreen(
     tripId: Long,
@@ -113,8 +116,8 @@ fun MembersScreen(
             SoftScreenCanvas(modifier = Modifier.padding(padding)) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     item {
                         SectionHeader(
@@ -125,28 +128,29 @@ fun MembersScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .shadow(3.dp, RoundedCornerShape(18.dp), clip = false)
+                                .shadow(2.dp, RoundedCornerShape(18.dp), clip = false)
                                 .clip(RoundedCornerShape(18.dp))
                                 .background(Color.White)
-                                .padding(16.dp),
+                                .padding(horizontal = 16.dp, vertical = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
                                 "Contributions collected",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = Color(0xFF8A9E99),
                             )
                             Text(
                                 Money.formatInr(collectedTotal),
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = Teal700,
-                                modifier = Modifier.padding(top = 4.dp),
+                                fontWeight = FontWeight.SemiBold,
                             )
                             Text(
                                 "of ${Money.formatInr(expectedTotal)} expected · ${(collectedProgress.coerceAtMost(1f) * 100).toInt()}%",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
+                                color = Color(0xFF5A6F6A),
                             )
+                            Spacer(Modifier.height(4.dp))
                             LinearProgressIndicator(
                                 progress = { collectedProgress.coerceIn(0f, 1f) },
                                 modifier = Modifier
@@ -160,45 +164,20 @@ fun MembersScreen(
                     }
                     items(state.balances, key = { it.memberId }) { balance ->
                         val member = state.members.firstOrNull { it.id == balance.memberId }
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .shadow(3.dp, RoundedCornerShape(18.dp), clip = false)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(Color.White)
-                                .padding(14.dp),
-                        ) {
-                            MemberRow(
-                                balance = balance,
-                                onEdit = { member?.let { editingMember = it } },
-                                onDelete = { member?.let { deletingMember = it } },
-                                onAddPayment = { member?.let { contributionForMember = it } },
-                                onToggleHistory = {
-                                    historyMemberId =
-                                        if (historyMemberId == balance.memberId) null else balance.memberId
-                                },
-                                historyExpanded = historyMemberId == balance.memberId,
-                            )
-                            if (historyMemberId == balance.memberId) {
-                                Spacer(Modifier.height(8.dp))
-                                val history = state.contributions.filter { it.memberId == balance.memberId }
-                                if (history.isEmpty()) {
-                                    Text(
-                                        "No payments recorded.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                } else {
-                                    history.forEach { contribution ->
-                                        ContributionHistoryRow(
-                                            contribution = contribution,
-                                            onEdit = { editingContribution = contribution },
-                                            onDelete = { deletingContribution = contribution },
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        MemberCard(
+                            balance = balance,
+                            historyExpanded = historyMemberId == balance.memberId,
+                            history = state.contributions.filter { it.memberId == balance.memberId },
+                            onEdit = { member?.let { editingMember = it } },
+                            onDelete = { member?.let { deletingMember = it } },
+                            onAddPayment = { member?.let { contributionForMember = it } },
+                            onToggleHistory = {
+                                historyMemberId =
+                                    if (historyMemberId == balance.memberId) null else balance.memberId
+                            },
+                            onEditContribution = { editingContribution = it },
+                            onDeleteContribution = { deletingContribution = it },
+                        )
                     }
                     item { Spacer(Modifier.height(72.dp)) }
                 }
@@ -230,8 +209,8 @@ fun MembersScreen(
             existing = null,
             defaultMemberId = member.id,
             onDismiss = { contributionForMember = null },
-            onSave = { memberId, amount, note, onResult ->
-                viewModel.addContribution(tripId, memberId, amount, note, onResult)
+            onSave = { memberId, amount, note, paidAt, onResult ->
+                viewModel.addContribution(tripId, memberId, amount, note, paidAt, onResult)
             },
         )
     }
@@ -241,8 +220,8 @@ fun MembersScreen(
             existing = contribution,
             defaultMemberId = contribution.memberId,
             onDismiss = { editingContribution = null },
-            onSave = { _, amount, note, onResult ->
-                viewModel.updateContribution(contribution, amount, note, onResult)
+            onSave = { _, amount, note, paidAt, onResult ->
+                viewModel.updateContribution(contribution, amount, note, paidAt, onResult)
             },
         )
     }
@@ -271,13 +250,16 @@ fun MembersScreen(
 }
 
 @Composable
-private fun MemberRow(
+private fun MemberCard(
     balance: MemberBalance,
+    historyExpanded: Boolean,
+    history: List<ContributionEntity>,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onAddPayment: () -> Unit,
     onToggleHistory: () -> Unit,
-    historyExpanded: Boolean,
+    onEditContribution: (ContributionEntity) -> Unit,
+    onDeleteContribution: (ContributionEntity) -> Unit,
 ) {
     val status = memberPayStatus(balance.outstandingPaise, balance.paidPaise)
     val memberProgress = if (balance.expectedPaise > 0) {
@@ -285,70 +267,72 @@ private fun MemberRow(
     } else {
         0f
     }
+    val balanceText = if (balance.hasExcess) {
+        "Excess ${Money.formatInr(balance.excessPaise)}"
+    } else {
+        "Outstanding ${Money.formatInr(balance.outstandingPaise)}"
+    }
+    val balanceColor = when {
+        balance.hasExcess -> CoastalTokens.positive
+        balance.outstandingPaise > 0 -> CoastalTokens.negative
+        else -> Color(0xFF1A2B28)
+    }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp, RoundedCornerShape(18.dp), clip = false)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             MemberAvatar(balance.name)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp)
-                    .clickable(onClick = onToggleHistory),
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(balance.name, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        balance.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF0F2A26),
+                    )
                     MemberStatusBadge(status)
                 }
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "Expected ${Money.formatInr(balance.expectedPaise)} · Paid ${Money.formatInr(balance.paidPaise)}",
+                    text = "Expected ${Money.formatInr(balance.expectedPaise)}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    color = Color(0xFF5A6F6A),
                 )
-                val balanceText = if (balance.hasExcess) {
-                    "Excess ${Money.formatInr(balance.excessPaise)}"
-                } else {
-                    "Outstanding ${Money.formatInr(balance.outstandingPaise)}"
-                }
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text = balanceText,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = when {
-                        balance.hasExcess -> CoastalTokens.positive
-                        balance.outstandingPaise > 0 -> CoastalTokens.negative
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
-                    modifier = Modifier.padding(top = 4.dp),
+                    text = "Paid ${Money.formatInr(balance.paidPaise)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF5A6F6A),
                 )
-                Text(
-                    text = if (historyExpanded) "Hide history" else "Payment history",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Teal600,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
-            IconButton(onClick = onAddPayment) {
-                Icon(Icons.Default.Payments, contentDescription = "Record payment")
-            }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit member")
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete member")
             }
         }
-        Spacer(Modifier.height(10.dp))
+
+        Text(
+            text = balanceText,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = balanceColor,
+        )
+
         LinearProgressIndicator(
             progress = { memberProgress.coerceIn(0f, 1f) },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(6.dp)
+                .height(7.dp)
                 .clip(RoundedCornerShape(999.dp)),
             color = when {
                 balance.hasExcess -> Teal600
@@ -357,6 +341,117 @@ private fun MemberRow(
             },
             trackColor = Color(0xFFE8EEF0),
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MemberActionChip(
+                label = "Pay",
+                icon = Icons.Outlined.Payments,
+                onClick = onAddPayment,
+                filled = true,
+                modifier = Modifier.weight(1f),
+            )
+            MemberActionChip(
+                label = "Edit",
+                icon = Icons.Outlined.Edit,
+                onClick = onEdit,
+                modifier = Modifier.weight(1f),
+            )
+            MemberActionChip(
+                label = "Delete",
+                icon = Icons.Outlined.Delete,
+                onClick = onDelete,
+                danger = true,
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onToggleHistory)
+                .background(Color(0xFFF3F8F7))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = if (historyExpanded) "Hide payment history" else "Payment history",
+                style = MaterialTheme.typography.labelLarge,
+                color = Teal700,
+            )
+            Icon(
+                imageVector = if (historyExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = null,
+                tint = Teal600,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+
+        if (historyExpanded) {
+            if (history.isEmpty()) {
+                Text(
+                    "No payments recorded.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF8A9E99),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    history.forEach { contribution ->
+                        ContributionHistoryRow(
+                            contribution = contribution,
+                            onEdit = { onEditContribution(contribution) },
+                            onDelete = { onDeleteContribution(contribution) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MemberActionChip(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    filled: Boolean = false,
+    danger: Boolean = false,
+) {
+    val bg = when {
+        filled -> Teal600
+        danger -> Color(0xFFFCE8E4)
+        else -> Color(0xFFF3F8F7)
+    }
+    val fg = when {
+        filled -> Color.White
+        danger -> CoastalTokens.negative
+        else -> Color(0xFF1A2B28)
+    }
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .then(
+                if (!filled && !danger) {
+                    Modifier.border(1.dp, Color(0xFFD5E4E1), RoundedCornerShape(12.dp))
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.size(6.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, color = fg)
     }
 }
 
@@ -373,21 +468,24 @@ private fun ContributionHistoryRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(CoastalTokens.aquaMist.copy(alpha = 0.7f))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .background(Color(0xFFEAF5F4))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(Money.formatInr(contribution.amountPaise), style = MaterialTheme.typography.titleMedium)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                Money.formatInr(contribution.amountPaise),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
             Text(
                 text = formatter.format(Instant.ofEpochMilli(contribution.paidAt)),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF5A6F6A),
             )
             contribution.note?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium)
+                Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF5A6F6A))
             }
         }
         TextButton(onClick = onEdit) { Text("Edit") }

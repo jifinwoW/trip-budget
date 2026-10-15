@@ -34,18 +34,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tripbudget.app.R
 import com.tripbudget.app.data.ThemeMode
 import com.tripbudget.app.ui.components.EnterCascade
 import com.tripbudget.app.ui.components.SoftScreenCanvas
+import com.tripbudget.app.ui.theme.LoraFontFamily
 import com.tripbudget.app.ui.theme.Teal100
 import com.tripbudget.app.ui.theme.Teal600
 import com.tripbudget.app.ui.theme.Teal700
@@ -61,32 +64,38 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
             EnterCascade(0) {
                 Text(
                     text = "Preferences",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelMedium,
                     color = Teal600,
                 )
                 Text(
                     text = "Settings",
-                    style = MaterialTheme.typography.displayMedium,
-                    modifier = Modifier.padding(top = 4.dp),
+                    style = MaterialTheme.typography.headlineLarge,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
-            Spacer(Modifier.height(20.dp))
-            EnterCascade(50) {
-                Text("Appearance", style = MaterialTheme.typography.titleLarge)
-                Spacer(Modifier.height(10.dp))
+
+            Spacer(Modifier.height(14.dp))
+
+            EnterCascade(40) {
+                Text(
+                    "Appearance",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color(0xFF5A6F6A),
+                )
+                Spacer(Modifier.height(8.dp))
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(3.dp, RoundedCornerShape(18.dp), clip = false)
-                        .clip(RoundedCornerShape(18.dp))
+                        .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
+                        .clip(RoundedCornerShape(14.dp))
                         .background(Color.White)
                         .selectableGroup()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 2.dp),
                 ) {
                     ThemeMode.entries.forEach { mode ->
                         RowOption(
@@ -101,60 +110,21 @@ fun SettingsScreen(
                     }
                 }
             }
-            Spacer(Modifier.height(20.dp))
-            EnterCascade(100) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(3.dp, RoundedCornerShape(18.dp), clip = false)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color.White)
-                        .padding(16.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(Teal100),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Outlined.AccountBalanceWallet,
-                                contentDescription = null,
-                                tint = Teal700,
-                            )
-                        }
-                        Column(modifier = Modifier.padding(start = 12.dp)) {
-                            Text("About", style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                stringResource(R.string.brand_name),
-                                style = MaterialTheme.typography.headlineMedium,
-                                modifier = Modifier.padding(top = 2.dp),
-                            )
-                        }
-                    }
-                    Text(
-                        text = "Offline personal trip budget tracker.\nVersion 1.0.0",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    InfoRow(Icons.Outlined.Payments, "Currency", "INR")
-                    Spacer(Modifier.height(8.dp))
-                    InfoRow(Icons.Outlined.CloudOff, "Data storage", "On this device")
-                    Spacer(Modifier.height(8.dp))
-                    InfoRow(Icons.Outlined.Lock, "Accounts", "Not required")
-                }
+
+            Spacer(Modifier.height(14.dp))
+
+            EnterCascade(80) {
+                AboutSection()
             }
-            Spacer(Modifier.height(24.dp))
-            EnterCascade(150) {
+
+            Spacer(Modifier.height(14.dp))
+
+            EnterCascade(120) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
-                        .clip(RoundedCornerShape(20.dp)),
+                        .height(88.dp)
+                        .clip(RoundedCornerShape(14.dp)),
                 ) {
                     Image(
                         painter = painterResource(R.drawable.bg_hero_ocean),
@@ -162,39 +132,138 @@ fun SettingsScreen(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.matchParentSize(),
                     )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.45f),
+                                    ),
+                                ),
+                            ),
+                    )
                     Text(
                         text = "Travel light. Track clearly.",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         color = Color.White,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(16.dp),
+                            .padding(12.dp),
                     )
                 }
             }
-            Spacer(Modifier.height(24.dp))
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-private fun InfoRow(
-    icon: ImageVector,
-    label: String,
-    value: String,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+private fun AboutSection() {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFF4F7F8))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = Teal700, modifier = Modifier.size(20.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.titleMedium, color = Teal700)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Teal100),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.AccountBalanceWallet,
+                    contentDescription = null,
+                    tint = Teal700,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "About",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFF8A9E99),
+                )
+                Text(
+                    stringResource(R.string.brand_name),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontFamily = LoraFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0F2A26),
+                )
+            }
+            Text(
+                "v1.0.0",
+                style = MaterialTheme.typography.labelMedium,
+                color = Teal600,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFFEAF5F4))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+
+        Text(
+            text = "Offline personal trip budget tracker.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF5A6F6A),
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AboutChip(
+                icon = Icons.Outlined.Payments,
+                label = "INR",
+                modifier = Modifier.weight(1f),
+            )
+            AboutChip(
+                icon = Icons.Outlined.CloudOff,
+                label = "On device",
+                modifier = Modifier.weight(1f),
+            )
+            AboutChip(
+                icon = Icons.Outlined.Lock,
+                label = "No account",
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AboutChip(
+    icon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFF3F8F7))
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = Teal600, modifier = Modifier.size(14.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color(0xFF1A2B28),
+            maxLines = 1,
+        )
     }
 }
 
@@ -212,15 +281,15 @@ private fun RowOption(
                 onClick = onClick,
                 role = Role.RadioButton,
             )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         RadioButton(
             selected = selected,
             onClick = null,
             colors = RadioButtonDefaults.colors(selectedColor = Teal600),
         )
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Text(label, style = MaterialTheme.typography.bodyMedium)
     }
 }

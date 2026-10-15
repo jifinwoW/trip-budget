@@ -29,8 +29,12 @@ import androidx.compose.ui.unit.dp
 import com.tripbudget.app.data.entity.ContributionEntity
 import com.tripbudget.app.data.entity.MemberEntity
 import com.tripbudget.app.domain.Money
+import com.tripbudget.app.ui.components.DatePickerField
 import com.tripbudget.app.ui.components.MoneyTextField
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +47,7 @@ fun ContributionEditorDialog(
         memberId: Long,
         amountRupees: String,
         note: String?,
+        paidAt: Long,
         onResult: (String?) -> Unit,
     ) -> Unit,
 ) {
@@ -53,6 +58,13 @@ fun ContributionEditorDialog(
         mutableStateOf(existing?.let { Money.paiseToRupeesString(it.amountPaise) }.orEmpty())
     }
     var note by remember(existing) { mutableStateOf(existing?.note.orEmpty()) }
+    var date by remember(existing) {
+        mutableStateOf(
+            existing?.let {
+                Instant.ofEpochMilli(it.paidAt).atZone(ZoneId.systemDefault()).toLocalDate()
+            } ?: LocalDate.now(),
+        )
+    }
     var error by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(false) }
     val selectedMember = members.firstOrNull { it.id == memberId }
@@ -124,6 +136,11 @@ fun ContributionEditorDialog(
                 isError = error != null,
                 supportingText = error,
             )
+            DatePickerField(
+                value = date,
+                onValueChange = { date = it },
+                label = "Payment date",
+            )
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
@@ -140,7 +157,8 @@ fun ContributionEditorDialog(
                         error = "Select a member"
                         return@PrimaryCoastalButton
                     }
-                    onSave(id, amount, note) { result ->
+                    val paidAt = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    onSave(id, amount, note, paidAt) { result ->
                         if (result == null) onDismiss() else error = result
                     }
                 },

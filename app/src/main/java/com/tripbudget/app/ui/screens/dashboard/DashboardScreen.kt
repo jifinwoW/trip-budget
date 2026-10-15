@@ -422,8 +422,8 @@ fun DashboardScreen(
             existing = null,
             defaultMemberId = state.members.firstOrNull()?.id,
             onDismiss = { showAddContribution = false },
-            onSave = { memberId, amount, note, onResult ->
-                viewModel.addContribution(trip.id, memberId, amount, note, onResult)
+            onSave = { memberId, amount, note, paidAt, onResult ->
+                viewModel.addContribution(trip.id, memberId, amount, note, paidAt, onResult)
             },
         )
     }
