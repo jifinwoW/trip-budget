@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -29,26 +32,46 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.MaterialTheme
 import com.tripbudget.app.R
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.Money
+import com.tripbudget.app.ui.components.DatePickerField
 import com.tripbudget.app.ui.components.MoneyTextField
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripEditorDialog(
     existing: TripEntity?,
     onDismiss: () -> Unit,
-    onSave: (name: String, destination: String?, budgetRupees: String, onResult: (String?) -> Unit) -> Unit,
+    onSave: (
+        name: String,
+        destination: String?,
+        budgetRupees: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        onResult: (String?) -> Unit,
+    ) -> Unit,
 ) {
     var name by remember(existing) { mutableStateOf(existing?.name.orEmpty()) }
     var destination by remember(existing) { mutableStateOf(existing?.destination.orEmpty()) }
     var budget by remember(existing) {
         mutableStateOf(existing?.let { Money.paiseToRupeesString(it.plannedBudgetPaise) }.orEmpty())
     }
+    var startDate by remember(existing) {
+        mutableStateOf(
+            existing?.startDateEpochDay?.let { LocalDate.ofEpochDay(it) } ?: LocalDate.now(),
+        )
+    }
+    var endDate by remember(existing) {
+        mutableStateOf(
+            existing?.endDateEpochDay?.let { LocalDate.ofEpochDay(it) }
+                ?: LocalDate.now().plusDays(6),
+        )
+    }
     var error by remember { mutableStateOf<String?>(null) }
+    var dateError by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -61,7 +84,8 @@ fun TripEditorDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp),
+                .padding(bottom = 28.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
@@ -110,6 +134,28 @@ fun TripEditorDialog(
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
+            DatePickerField(
+                value = startDate,
+                onValueChange = { picked ->
+                    startDate = picked
+                    dateError = null
+                    if (endDate.isBefore(picked)) {
+                        endDate = picked
+                    }
+                },
+                label = "Start date",
+            )
+            DatePickerField(
+                value = endDate,
+                onValueChange = {
+                    endDate = it
+                    dateError = null
+                },
+                label = "End date",
+                isError = dateError != null,
+                supportingText = dateError,
+                minDate = startDate,
+            )
             MoneyTextField(
                 value = budget,
                 onValueChange = { budget = it },
@@ -121,8 +167,16 @@ fun TripEditorDialog(
             PrimaryCoastalButton(
                 text = "Save trip",
                 onClick = {
-                    onSave(name, destination, budget) { result ->
-                        if (result == null) onDismiss() else error = result
+                    if (endDate.isBefore(startDate)) {
+                        dateError = "End date must be on or after start"
+                        return@PrimaryCoastalButton
+                    }
+                    onSave(name, destination, budget, startDate, endDate) { result ->
+                        when {
+                            result == null -> onDismiss()
+                            result.contains("date", ignoreCase = true) -> dateError = result
+                            else -> error = result
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),

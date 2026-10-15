@@ -12,6 +12,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -36,6 +37,8 @@ fun DatePickerField(
     modifier: Modifier = Modifier,
     isError: Boolean = false,
     supportingText: String? = null,
+    minDate: LocalDate? = null,
+    maxDate: LocalDate? = null,
 ) {
     var showPicker by remember { mutableStateOf(false) }
     val display = remember(value) {
@@ -70,7 +73,22 @@ fun DatePickerField(
         val initialMillis = remember(value) {
             value.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
         }
-        val pickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        val selectableDates = remember(minDate, maxDate) {
+            object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    val date = Instant.ofEpochMilli(utcTimeMillis)
+                        .atZone(ZoneOffset.UTC)
+                        .toLocalDate()
+                    if (minDate != null && date.isBefore(minDate)) return false
+                    if (maxDate != null && date.isAfter(maxDate)) return false
+                    return true
+                }
+            }
+        }
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialMillis,
+            selectableDates = selectableDates,
+        )
         DatePickerDialog(
             onDismissRequest = { showPicker = false },
             confirmButton = {

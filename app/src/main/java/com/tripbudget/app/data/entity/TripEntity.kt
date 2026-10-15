@@ -9,5 +9,9 @@ data class TripEntity(
     val name: String,
     val destination: String? = null,
     val plannedBudgetPaise: Long,
+    /** Inclusive trip start, as LocalDate epoch day. Null for trips created before date range existed. */
+    val startDateEpochDay: Long? = null,
+    /** Inclusive trip end, as LocalDate epoch day. Null for trips created before date range existed. */
+    val endDateEpochDay: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
 )

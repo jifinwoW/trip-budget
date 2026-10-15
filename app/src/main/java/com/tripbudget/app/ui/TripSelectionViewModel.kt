@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.Money
+import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -54,12 +55,18 @@ class TripSelectionViewModel(
         name: String,
         destination: String?,
         budgetRupees: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             val trimmedName = name.trim()
             if (trimmedName.isEmpty()) {
                 onResult("Trip name is required")
+                return@launch
+            }
+            if (endDate.isBefore(startDate)) {
+                onResult("End date must be on or after start")
                 return@launch
             }
             val paise = Money.rupeesToPaise(budgetRupees)
@@ -72,6 +79,8 @@ class TripSelectionViewModel(
                     name = trimmedName,
                     destination = destination?.trim()?.takeIf { it.isNotEmpty() },
                     plannedBudgetPaise = paise,
+                    startDateEpochDay = startDate.toEpochDay(),
+                    endDateEpochDay = endDate.toEpochDay(),
                 ),
             )
             selectedTripId.value = id
@@ -84,12 +93,18 @@ class TripSelectionViewModel(
         name: String,
         destination: String?,
         budgetRupees: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             val trimmedName = name.trim()
             if (trimmedName.isEmpty()) {
                 onResult("Trip name is required")
+                return@launch
+            }
+            if (endDate.isBefore(startDate)) {
+                onResult("End date must be on or after start")
                 return@launch
             }
             val paise = Money.rupeesToPaise(budgetRupees)
@@ -102,6 +117,8 @@ class TripSelectionViewModel(
                     name = trimmedName,
                     destination = destination?.trim()?.takeIf { it.isNotEmpty() },
                     plannedBudgetPaise = paise,
+                    startDateEpochDay = startDate.toEpochDay(),
+                    endDateEpochDay = endDate.toEpochDay(),
                 ),
             )
             onResult(null)

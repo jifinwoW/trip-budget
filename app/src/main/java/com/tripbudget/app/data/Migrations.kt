@@ -53,4 +53,12 @@ object Migrations {
             )
         }
     }
+
+    /** v2 → v3: optional trip date range (start/end epoch days). */
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `trips` ADD COLUMN `startDateEpochDay` INTEGER")
+            db.execSQL("ALTER TABLE `trips` ADD COLUMN `endDateEpochDay` INTEGER")
+        }
+    }
 }

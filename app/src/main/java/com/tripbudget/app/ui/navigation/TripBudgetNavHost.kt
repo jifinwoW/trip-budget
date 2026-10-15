@@ -61,6 +61,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.tripbudget.app.data.ThemePreferences
 import com.tripbudget.app.data.TripRepository
+import com.tripbudget.app.domain.TripDates
 import com.tripbudget.app.ui.TripSelectionUiState
 import com.tripbudget.app.ui.TripSelectionViewModel
 import com.tripbudget.app.ui.components.ConfirmDialog
@@ -129,8 +130,15 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = null,
                     onDismiss = { showCreateTrip = false },
-                    onSave = { name, destination, budget, onResult ->
-                        tripSelectionVm.createTrip(name, destination, budget, onResult)
+                    onSave = { name, destination, budget, startDate, endDate, onResult ->
+                        tripSelectionVm.createTrip(
+                            name,
+                            destination,
+                            budget,
+                            startDate,
+                            endDate,
+                            onResult,
+                        )
                     },
                 )
             }
@@ -243,8 +251,15 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = null,
                     onDismiss = { showCreateTrip = false },
-                    onSave = { name, destination, budget, onResult ->
-                        tripSelectionVm.createTrip(name, destination, budget, onResult)
+                    onSave = { name, destination, budget, startDate, endDate, onResult ->
+                        tripSelectionVm.createTrip(
+                            name,
+                            destination,
+                            budget,
+                            startDate,
+                            endDate,
+                            onResult,
+                        )
                     },
                 )
             }
@@ -252,8 +267,16 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = selectedTrip,
                     onDismiss = { showEditTrip = false },
-                    onSave = { name, destination, budget, onResult ->
-                        tripSelectionVm.updateTrip(selectedTrip, name, destination, budget, onResult)
+                    onSave = { name, destination, budget, startDate, endDate, onResult ->
+                        tripSelectionVm.updateTrip(
+                            selectedTrip,
+                            name,
+                            destination,
+                            budget,
+                            startDate,
+                            endDate,
+                            onResult,
+                        )
                     },
                 )
             }
@@ -386,6 +409,7 @@ private fun CoastalAppHeader(
                                     text = buildString {
                                         append(trip.name)
                                         trip.destination?.let { append(" · $it") }
+                                        TripDates.formatRange(trip)?.let { append(" · $it") }
                                     },
                                 )
                             },

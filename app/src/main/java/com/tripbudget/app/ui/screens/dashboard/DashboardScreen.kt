@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PendingActions
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.ShoppingBag
@@ -54,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tripbudget.app.R
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.Money
+import com.tripbudget.app.domain.TripDates
 import com.tripbudget.app.ui.components.CategoryIcon
 import com.tripbudget.app.ui.components.EnterCascade
 import com.tripbudget.app.ui.components.ExpenseSourceChip
@@ -143,6 +145,7 @@ fun DashboardScreen(
                 TripScenicHeader(
                     tripName = trip.name,
                     destination = trip.destination,
+                    dateRange = TripDates.formatRange(trip),
                     plannedBudgetPaise = totals.plannedBudgetPaise,
                     onEditBudget = onEditTrip,
                 )
@@ -459,6 +462,7 @@ fun DashboardScreen(
 private fun TripScenicHeader(
     tripName: String,
     destination: String?,
+    dateRange: String?,
     plannedBudgetPaise: Long,
     onEditBudget: () -> Unit,
 ) {
@@ -515,6 +519,25 @@ private fun TripScenicHeader(
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White.copy(alpha = 0.92f),
                 )
+            }
+            if (dateRange != null) {
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        Icons.Outlined.DateRange,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.92f),
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = dateRange,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.92f),
+                    )
+                }
             }
         }
 
