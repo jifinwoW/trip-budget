@@ -314,7 +314,7 @@ fun SoftProgressCard(
             label = "Contributions collected",
             percentLabel = "$collectedPct%",
             progress = collectedProgress.coerceIn(0f, 1f),
-            fillColor = Color(0xFFE8A07A),
+            fillColor = Color(0xFF0D8B8A),
         )
     }
 }

@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TripBudget</string>
+    <!-- Launcher / system label -->
+    <string name="app_name">Chilavu</string>
+    <!-- In-app brand shown in Malayalam -->
+    <string name="brand_name">ചിലവ്</string>
 </resources>

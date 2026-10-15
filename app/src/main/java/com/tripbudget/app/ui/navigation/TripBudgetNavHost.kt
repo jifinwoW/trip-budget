@@ -46,11 +46,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.tripbudget.app.R
+import com.tripbudget.app.ui.theme.LoraFontFamily
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -119,7 +120,7 @@ fun TripBudgetNavHost(
         }
         tripState.trips.isEmpty() -> {
             EmptyState(
-                title = "TripBudget",
+                title = stringResource(R.string.brand_name),
                 message = "Create your first trip to track budget, contributions, and expenses offline.",
                 actionLabel = "Create trip",
                 onAction = { showCreateTrip = true },
@@ -336,10 +337,10 @@ private fun CoastalAppHeader(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = "TripBudget",
-                fontFamily = FontFamily.Serif,
+                text = stringResource(R.string.brand_name),
+                style = MaterialTheme.typography.headlineSmall,
+                fontFamily = LoraFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
                 color = Color(0xFF0F2A26),
                 maxLines = 1,
             )
