@@ -4,12 +4,11 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.unit.sp
 
 /**
- * Display serif for trip names + money heroes; geometric sans for UI chrome.
- * Scale is intentionally extreme so cash figures dominate memory.
+ * Soft display serif for trip titles and money heroes;
+ * clean sans for UI chrome — friendly coastal typography.
  */
 private val Display = FontFamily.Serif
 private val Body = FontFamily.SansSerif
@@ -18,43 +17,41 @@ val TripBudgetTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Bold,
-        fontSize = 48.sp,
-        lineHeight = 52.sp,
-        letterSpacing = (-1.2).sp,
+        fontSize = 42.sp,
+        lineHeight = 48.sp,
+        letterSpacing = (-0.8).sp,
     ),
     displayMedium = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 36.sp,
-        lineHeight = 40.sp,
-        letterSpacing = (-0.8).sp,
+        fontSize = 32.sp,
+        lineHeight = 38.sp,
+        letterSpacing = (-0.5).sp,
     ),
     headlineLarge = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 30.sp,
-        lineHeight = 36.sp,
-        letterSpacing = (-0.4).sp,
+        fontSize = 28.sp,
+        lineHeight = 34.sp,
+        letterSpacing = (-0.3).sp,
     ),
     headlineMedium = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Medium,
-        fontSize = 24.sp,
-        lineHeight = 30.sp,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
     ),
     titleLarge = TextStyle(
         fontFamily = Body,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 18.sp,
+        fontSize = 17.sp,
         lineHeight = 24.sp,
-        letterSpacing = 0.1.sp,
     ),
     titleMedium = TextStyle(
         fontFamily = Body,
         fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp,
         lineHeight = 20.sp,
-        letterSpacing = 0.15.sp,
     ),
     bodyLarge = TextStyle(
         fontFamily = Body,
@@ -73,21 +70,20 @@ val TripBudgetTypography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 1.4.sp,
+        letterSpacing = 0.8.sp,
     ),
     labelMedium = TextStyle(
         fontFamily = Body,
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
         lineHeight = 14.sp,
-        letterSpacing = 1.6.sp,
+        letterSpacing = 0.6.sp,
     ),
     labelSmall = TextStyle(
         fontFamily = Body,
         fontWeight = FontWeight.Medium,
         fontSize = 10.sp,
         lineHeight = 12.sp,
-        letterSpacing = 1.8.sp,
-        baselineShift = BaselineShift(0.05f),
+        letterSpacing = 0.5.sp,
     ),
 )

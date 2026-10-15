@@ -5,6 +5,7 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -21,12 +22,12 @@ fun EnterCascade(
     AnimatedVisibility(
         visibleState = visible,
         modifier = modifier,
-        enter = fadeIn(tween(420, delayMillis = delayMillis)) +
+        enter = fadeIn(tween(360, delayMillis = delayMillis)) +
             slideInVertically(
-                animationSpec = tween(480, delayMillis = delayMillis),
-                initialOffsetY = { it / 10 },
+                animationSpec = tween(400, delayMillis = delayMillis),
+                initialOffsetY = { it / 14 },
             ),
     ) {
-        content()
+        Column { content() }
     }
 }

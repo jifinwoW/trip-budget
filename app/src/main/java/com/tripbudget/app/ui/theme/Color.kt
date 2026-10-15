@@ -3,25 +3,26 @@ package com.tripbudget.app.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Expedition Cashbox palette.
- * Cool mineral paper + spruce ink + sea-glass action + oxide alert.
- * Intentionally avoids purple gradients and warm cream/terracotta clichés.
+ * Coastal Soft palette — misty aqua travel finance.
+ * Light-first; tinted metric tiles; coral only for overspend.
  */
-val Spruce950 = Color(0xFF07140F)
-val Spruce900 = Color(0xFF0E1F18)
-val Spruce800 = Color(0xFF1A3D32)
-val Spruce700 = Color(0xFF245244)
-val Sea600 = Color(0xFF0E7C66)
-val Sea400 = Color(0xFF2BB395)
-val Sea100 = Color(0xFFD8F3EC)
-val Mist50 = Color(0xFFEEF2F0)
-val Mist100 = Color(0xFFE2E8E5)
-val Paper = Color(0xFFF7F9F8)
-val Ink900 = Color(0xFF101814)
-val Ink600 = Color(0xFF4A5852)
-val Oxide600 = Color(0xFFC23B22)
-val Oxide100 = Color(0xFFFCE8E4)
-val Hairline = Color(0xFFB8C2BC)
-val NightBg = Color(0xFF0A1210)
-val NightSurface = Color(0xFF14201C)
-val NightElevated = Color(0xFF1C2C27)
+val AquaMist = Color(0xFFEAF6F4)
+val SoftCanvas = Color(0xFFF4F7F8)
+val AquaMistDeep = Color(0xFFD8EFEA)
+val Teal700 = Color(0xFF0B7A6E)
+val Teal600 = Color(0xFF0D9B8A)
+val Teal100 = Color(0xFFD5F3EE)
+val MintHero = Color(0xFFC8EDE4)
+val PaleBlue = Color(0xFFD7EAF7)
+val Sand = Color(0xFFF3E8D4)
+val SoftRose = Color(0xFFF6DCE0)
+val Peach = Color(0xFFF8E0D0)
+val Charcoal900 = Color(0xFF1A2B28)
+val Charcoal600 = Color(0xFF5A6F6A)
+val Coral600 = Color(0xFFE85D4C)
+val Coral100 = Color(0xFFFCE8E4)
+val PaperWhite = Color(0xFFFFFFFF)
+val HairlineSoft = Color(0xFFC5D8D3)
+val NightBg = Color(0xFF0C1816)
+val NightSurface = Color(0xFF152422)
+val NightElevated = Color(0xFF1C2E2B)
