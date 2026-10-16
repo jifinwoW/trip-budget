@@ -6,9 +6,11 @@ import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.ContributionEntity
 import com.tripbudget.app.data.entity.ExpenseEntity
 import com.tripbudget.app.data.entity.MemberEntity
+import com.tripbudget.app.data.entity.RouteStopEntity
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.ExpenseCategory
 import com.tripbudget.app.domain.PaymentSource
+import com.tripbudget.app.domain.RouteStopStatus
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
@@ -61,6 +63,7 @@ class SyncEngine(
         pushMembers(supabase)
         pushContributions(supabase)
         pushExpenses(supabase)
+        pushRouteStops(supabase)
 
         // Pull every trip this user can access (owned + joined).
         pullAll(supabase)
@@ -120,7 +123,7 @@ class SyncEngine(
             runCatching {
                 val channel = supabase.channel("trip-live-$userId")
                 realtimeChannel = channel
-                listOf("trips", "members", "contributions", "expenses").forEach { tableName ->
+                listOf("trips", "members", "contributions", "expenses", "route_stops").forEach { tableName ->
                     channel.postgresChangeFlow<PostgresAction>(schema = "public") {
                         table = tableName
                     }.onEach {
@@ -167,6 +170,7 @@ class SyncEngine(
         pullMembers(supabase)
         pullContributions(supabase)
         pullExpenses(supabase)
+        pullRouteStops(supabase)
     }
 
     /** Upload trip (if needed) and return its share code. */
@@ -216,6 +220,7 @@ class SyncEngine(
             endDateEpochDay = trip.endDateEpochDay,
             createdAtMillis = trip.createdAt,
             inviteCode = invite.uppercase(),
+            routeTrackingActive = trip.routeTrackingActive,
             updatedAt = CloudTime.toIso(trip.updatedAt),
         )
     }
@@ -252,6 +257,7 @@ class SyncEngine(
                     set("planned_budget_paise", remote.plannedBudgetPaise)
                     set("start_date_epoch_day", remote.startDateEpochDay)
                     set("end_date_epoch_day", remote.endDateEpochDay)
+                    set("route_tracking_active", remote.routeTrackingActive)
                     set("updated_at", remote.updatedAt)
                 },
             ) {
@@ -384,6 +390,7 @@ class SyncEngine(
                 remoteId = remote.id,
                 remoteOwnerId = remote.ownerId,
                 inviteCode = remote.inviteCode,
+                routeTrackingActive = remote.routeTrackingActive,
                 updatedAt = remoteUpdated,
             )
             repository.putTripSynced(entity)
@@ -479,6 +486,67 @@ class SyncEngine(
         repository.deleteSyncedExpensesNotIn(remotes.map { it.id })
     }
 
+    private suspend fun pushRouteStops(supabase: SupabaseClient) {
+        val tripsByLocalId = repository.getAllTrips().associateBy { it.id }
+        val locals = repository.getAllRouteStops()
+        val payloads = mutableListOf<RemoteRouteStop>()
+        for (row in locals) {
+            val tripRemote = tripsByLocalId[row.tripId]?.remoteId ?: continue
+            val remoteId = row.remoteId ?: UUID.randomUUID().toString()
+            val updated = row.copy(remoteId = remoteId)
+            if (row.remoteId == null) {
+                repository.putRouteStopSynced(updated)
+            }
+            payloads += RemoteRouteStop(
+                id = remoteId,
+                tripId = tripRemote,
+                sortOrder = updated.sortOrder,
+                title = updated.title,
+                subtitle = updated.subtitle,
+                lat = updated.lat,
+                lng = updated.lng,
+                osmPlaceId = updated.osmPlaceId,
+                status = updated.status.name,
+                note = updated.note,
+                updatedAt = CloudTime.toIso(updated.updatedAt),
+            )
+        }
+        if (payloads.isNotEmpty()) {
+            supabase.from("route_stops").upsert(payloads)
+        }
+    }
+
+    private suspend fun pullRouteStops(supabase: SupabaseClient) {
+        val remotes = supabase.from("route_stops").select().decodeList<RemoteRouteStop>()
+        val tripsByRemote = repository.getAllTrips().mapNotNull { t ->
+            t.remoteId?.let { it to t }
+        }.toMap()
+        for (remote in remotes) {
+            val trip = tripsByRemote[remote.tripId] ?: continue
+            val remoteUpdated = CloudTime.fromIso(remote.updatedAt)
+            val existing = repository.getRouteStopByRemoteId(remote.id)
+            if (existing != null && existing.updatedAt > remoteUpdated) continue
+            val status = runCatching { RouteStopStatus.valueOf(remote.status) }
+                .getOrDefault(RouteStopStatus.UPCOMING)
+            val entity = RouteStopEntity(
+                id = existing?.id ?: 0,
+                tripId = trip.id,
+                sortOrder = remote.sortOrder,
+                title = remote.title,
+                subtitle = remote.subtitle,
+                lat = remote.lat,
+                lng = remote.lng,
+                osmPlaceId = remote.osmPlaceId,
+                status = status,
+                note = remote.note,
+                remoteId = remote.id,
+                updatedAt = remoteUpdated,
+            )
+            repository.putRouteStopSynced(entity)
+        }
+        repository.deleteSyncedRouteStopsNotIn(remotes.map { it.id })
+    }
+
     // --- Live push after each local write (when signed in) ---
 
     override fun onTripUpserted(localId: Long) = liveLaunch { upsertTrip(localId) }
@@ -500,6 +568,11 @@ class SyncEngine(
 
     override fun onExpenseDeleted(remoteId: String?) =
         liveLaunch { deleteRemoteRow("expenses", remoteId) }
+
+    override fun onRouteStopUpserted(localId: Long) = liveLaunch { upsertRouteStop(localId) }
+
+    override fun onRouteStopDeleted(remoteId: String?) =
+        liveLaunch { deleteRemoteRow("route_stops", remoteId) }
 
     private fun liveLaunch(block: suspend () -> Unit) {
         liveScope.launch {
@@ -550,6 +623,7 @@ class SyncEngine(
                     set("planned_budget_paise", remote.plannedBudgetPaise)
                     set("start_date_epoch_day", remote.startDateEpochDay)
                     set("end_date_epoch_day", remote.endDateEpochDay)
+                    set("route_tracking_active", remote.routeTrackingActive)
                     set("updated_at", remote.updatedAt)
                 },
             ) {
@@ -622,6 +696,32 @@ class SyncEngine(
                 paidByMemberId = paidByRemote,
                 paymentSource = latest.paymentSource.name,
                 notes = latest.notes,
+                updatedAt = CloudTime.toIso(latest.updatedAt),
+            ),
+        )
+    }
+
+    private suspend fun upsertRouteStop(localId: Long) {
+        val (supabase, _) = requireClientAndOwner() ?: return
+        val row = repository.getRouteStop(localId) ?: return
+        val tripRemote = ensureTripRemoteId(row.tripId) ?: return
+        val remoteId = row.remoteId ?: UUID.randomUUID().toString()
+        if (row.remoteId == null) {
+            repository.putRouteStopSynced(row.copy(remoteId = remoteId))
+        }
+        val latest = repository.getRouteStop(localId) ?: return
+        supabase.from("route_stops").upsert(
+            RemoteRouteStop(
+                id = remoteId,
+                tripId = tripRemote,
+                sortOrder = latest.sortOrder,
+                title = latest.title,
+                subtitle = latest.subtitle,
+                lat = latest.lat,
+                lng = latest.lng,
+                osmPlaceId = latest.osmPlaceId,
+                status = latest.status.name,
+                note = latest.note,
                 updatedAt = CloudTime.toIso(latest.updatedAt),
             ),
         )

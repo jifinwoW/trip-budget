@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,7 +52,7 @@ import com.tripbudget.app.ui.components.CoastalProgressTrack
 import com.tripbudget.app.ui.components.ConfirmDialog
 import com.tripbudget.app.ui.components.EmptyState
 import com.tripbudget.app.ui.components.LivePullRefresh
-import com.tripbudget.app.ui.components.LoadingContent
+import com.tripbudget.app.ui.components.ListShimmer
 import com.tripbudget.app.ui.components.MemberAvatar
 import com.tripbudget.app.ui.components.MemberStatusBadge
 import com.tripbudget.app.ui.components.SectionHeader
@@ -82,7 +83,7 @@ fun MembersScreen(
 
     val dataReady = !state.isLoading && state.tripId == tripId
     if (!dataReady) {
-        LoadingContent()
+        ListShimmer(rowHeight = 120.dp)
         return
     }
 
@@ -96,6 +97,8 @@ fun MembersScreen(
 
     Scaffold(
         containerColor = Color.Transparent,
+        // Outer nav host already handles status bar + app header; don't double-pad top.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddMember = true },
@@ -128,7 +131,7 @@ fun MembersScreen(
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
-                        top = 14.dp,
+                        top = 8.dp,
                         bottom = floatingNavContentPadding(),
                     ),
                     verticalArrangement = Arrangement.spacedBy(14.dp),

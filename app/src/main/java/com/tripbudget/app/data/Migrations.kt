@@ -106,4 +106,38 @@ object Migrations {
             db.execSQL("ALTER TABLE `trips` ADD COLUMN `inviteCode` TEXT")
         }
     }
+
+    /** v5 → v6: route stops + trip GPS tracking flag. */
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `trips` ADD COLUMN `routeTrackingActive` INTEGER NOT NULL DEFAULT 0",
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `route_stops` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `tripId` INTEGER NOT NULL,
+                    `sortOrder` INTEGER NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `subtitle` TEXT,
+                    `lat` REAL NOT NULL,
+                    `lng` REAL NOT NULL,
+                    `osmPlaceId` TEXT,
+                    `status` TEXT NOT NULL,
+                    `note` TEXT,
+                    `remoteId` TEXT,
+                    `updatedAt` INTEGER NOT NULL,
+                    FOREIGN KEY(`tripId`) REFERENCES `trips`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_route_stops_tripId` ON `route_stops` (`tripId`)",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_route_stops_remoteId` ON `route_stops` (`remoteId`)",
+            )
+        }
+    }
 }

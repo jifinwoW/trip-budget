@@ -38,6 +38,8 @@ class MainActivity : ComponentActivity() {
             keepSplash = false
         }
 
+        app.container.routeArrivalTracker.start()
+
         setContent {
             val settingsVm: SettingsViewModel = viewModel(
                 factory = SettingsViewModel.factory(
@@ -57,9 +59,15 @@ class MainActivity : ComponentActivity() {
                         authRepository = app.container.authRepository,
                         syncEngine = app.container.syncEngine,
                         syncPreferences = app.container.syncPreferences,
+                        routeArrivalTracker = app.container.routeArrivalTracker,
                     )
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        (application as TripBudgetApp).container.routeArrivalTracker.stop()
+        super.onDestroy()
     }
 }

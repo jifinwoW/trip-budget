@@ -8,6 +8,7 @@ import com.tripbudget.app.data.SyncPreferences
 import com.tripbudget.app.data.ThemePreferences
 import com.tripbudget.app.data.TripBudgetDatabase
 import com.tripbudget.app.data.TripRepository
+import com.tripbudget.app.location.RouteArrivalTracker
 import io.github.jan.supabase.auth.auth
 
 class AppContainer(context: Context) {
@@ -29,4 +30,6 @@ class AppContainer(context: Context) {
         // Live upsert/delete after each local write when signed in.
         repository.liveCloudPush = engine
     }
+
+    val routeArrivalTracker = RouteArrivalTracker(context, repository)
 }

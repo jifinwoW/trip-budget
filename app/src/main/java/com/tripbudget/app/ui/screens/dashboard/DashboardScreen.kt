@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Edit
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.TrendingDown
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -51,6 +53,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,17 +61,17 @@ import com.tripbudget.app.R
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.Money
 import com.tripbudget.app.domain.TripDates
+import com.tripbudget.app.places.WeatherKind
 import com.tripbudget.app.ui.components.CategoryIcon
 import com.tripbudget.app.ui.components.EnterCascade
 import com.tripbudget.app.ui.components.ExpenseSourceChip
 import com.tripbudget.app.ui.components.LivePullRefresh
-import com.tripbudget.app.ui.components.LoadingContent
+import com.tripbudget.app.ui.components.DashboardShimmer
 import com.tripbudget.app.ui.components.PremiumMetricTile
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
 import com.tripbudget.app.ui.components.SecondaryCoastalButton
 import com.tripbudget.app.ui.components.SharedCashHeroCard
 import com.tripbudget.app.ui.components.SoftCategoryChip
-import com.tripbudget.app.ui.components.SoftDashboardCanvas
 import com.tripbudget.app.ui.components.SoftProgressCard
 import com.tripbudget.app.ui.screens.expenses.ExpenseEditorDialog
 import com.tripbudget.app.ui.screens.members.ContributionEditorDialog
@@ -81,10 +84,13 @@ import java.time.LocalDate
 fun DashboardScreen(
     trip: TripEntity,
     viewModel: DashboardViewModel,
+    headerWeatherKind: WeatherKind? = null,
+    weatherUnderHero: Dp = 36.dp,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
     onEditTrip: () -> Unit = {},
     onViewAllExpenses: () -> Unit = {},
+    onOpenRoutePlan: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddContribution by remember { mutableStateOf(false) }
@@ -94,19 +100,7 @@ fun DashboardScreen(
     val totalsReady = !state.isLoading && state.trip?.id == trip.id && totals != null
 
     if (!totalsReady || totals == null) {
-        SoftDashboardCanvas {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = trip.destination?.takeIf { it.isNotBlank() } ?: "Trip",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Teal600,
-                    )
-                    Text(trip.name, style = MaterialTheme.typography.headlineLarge)
-                }
-                LoadingContent(modifier = Modifier.weight(1f))
-            }
-        }
+        DashboardShimmer()
         return
     }
 
@@ -148,9 +142,11 @@ fun DashboardScreen(
         0f
     }.coerceAtLeast(0f)
 
-    // Fixed hero; sheet + tiles keep the same look and scroll up over it.
+    // Keep rounded hero corners; rain sky from NavHost shows through the crescents
+    // because the top of this screen stays transparent for [weatherUnderHero].
     val heroHeight = 210.dp
     val heroOverlap = 24.dp
+    val heroCorner = 24.dp
     val scrollState = rememberScrollState()
     val density = LocalDensity.current
     val chipStayInteractivePx = with(density) { 40.dp.roundToPx() }
@@ -173,11 +169,16 @@ fun DashboardScreen(
     LivePullRefresh(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(CoastalTokens.canvas),
+        modifier = Modifier.fillMaxSize(),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            // Canvas starts below the corner zone so continuous rain isn’t covered.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = weatherUnderHero.coerceAtMost(heroCorner + 8.dp))
+                    .background(CoastalTokens.canvas),
+            )
             EnterCascade(0) {
                 TripScenicHeader(
                     tripName = trip.name,
@@ -188,6 +189,8 @@ fun DashboardScreen(
                     showBudgetChip = false,
                     imageZoom = heroImageZoom,
                     imageOffsetY = heroImageOffsetY,
+                    height = heroHeight,
+                    topCornerRadius = heroCorner,
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
             }
@@ -483,6 +486,19 @@ fun DashboardScreen(
                         .padding(end = 14.dp, bottom = 36.dp),
                 )
             }
+
+            FloatingActionButton(
+                onClick = onOpenRoutePlan,
+                containerColor = Teal600,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = floatingNavContentPadding() + 12.dp)
+                    .zIndex(3f),
+            ) {
+                Icon(Icons.Default.Map, contentDescription = "Route plan")
+            }
         }
     }
 
@@ -536,12 +552,14 @@ private fun TripScenicHeader(
     showBudgetChip: Boolean = true,
     imageZoom: Float = 1f,
     imageOffsetY: Float = 0f,
+    height: Dp = 210.dp,
+    topCornerRadius: Dp = 24.dp,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(210.dp)
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
+            .height(height)
+            .clip(RoundedCornerShape(topStart = topCornerRadius, topEnd = topCornerRadius)),
     ) {
         Image(
             painter = painterResource(R.drawable.bg_trip_header),

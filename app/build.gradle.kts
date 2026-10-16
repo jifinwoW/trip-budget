@@ -104,8 +104,13 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+    // Free interactive OpenStreetMap (no Google Maps billing)
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     val supabaseBom = platform("io.github.jan-tennert.supabase:bom:3.1.1")
+
     implementation(supabaseBom)
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")

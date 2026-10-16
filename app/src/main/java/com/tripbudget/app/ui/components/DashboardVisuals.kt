@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -341,24 +342,32 @@ fun CoastalProgressTrack(
     trackColor: Color = CoastalTokens.progressTrack,
     height: Dp = 8.dp,
 ) {
-    Box(
+    // Weight-based fill (not fillMaxWidth(fraction)) so 75%/100% always lays out correctly.
+    val clamped = progress.coerceIn(0f, 1f)
+    val fillWeight = clamped.coerceAtLeast(0.0001f)
+    val emptyWeight = (1f - clamped).coerceAtLeast(0.0001f)
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
             .clip(RoundedCornerShape(999.dp))
             .background(trackColor),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(fraction = progress.coerceIn(0f, 1f))
-                .height(height)
-                .clip(RoundedCornerShape(999.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(fillColor, fillColor.copy(alpha = 0.85f)),
+        if (clamped > 0f) {
+            Box(
+                modifier = Modifier
+                    .weight(fillWeight)
+                    .fillMaxHeight()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(fillColor, fillColor.copy(alpha = 0.85f)),
+                        ),
                     ),
-                ),
-        )
+            )
+        }
+        if (clamped < 1f) {
+            Spacer(modifier = Modifier.weight(emptyWeight))
+        }
     }
 }
 

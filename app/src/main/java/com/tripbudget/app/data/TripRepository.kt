@@ -4,13 +4,16 @@ import com.tripbudget.app.cloud.LiveCloudPush
 import com.tripbudget.app.data.entity.ContributionEntity
 import com.tripbudget.app.data.entity.ExpenseEntity
 import com.tripbudget.app.data.entity.MemberEntity
+import com.tripbudget.app.data.entity.RouteStopEntity
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.ExpenseAmount
+import com.tripbudget.app.domain.RouteStopStatus
 import com.tripbudget.app.domain.TripTotals
 import com.tripbudget.app.domain.TripTotalsCalculator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -22,6 +25,7 @@ class TripRepository(
     private val memberDao = db.memberDao()
     private val contributionDao = db.contributionDao()
     private val expenseDao = db.expenseDao()
+    private val routeStopDao = db.routeStopDao()
     private val clearMutex = Mutex()
 
     /** Set from AppContainer after SyncEngine is created (avoids construct-time cycles). */
@@ -43,6 +47,9 @@ class TripRepository(
 
     fun observeRecentExpenses(tripId: Long, limit: Int = 5): Flow<List<ExpenseEntity>> =
         expenseDao.observeRecent(tripId, limit)
+
+    fun observeRouteStops(tripId: Long): Flow<List<RouteStopEntity>> =
+        routeStopDao.observeByTrip(tripId)
 
     fun observeTripTotals(tripId: Long): Flow<TripTotals?> {
         return combine(
@@ -135,6 +142,106 @@ class TripRepository(
         liveCloudPush?.onExpenseDeleted(remoteId)
     }
 
+    suspend fun insertRouteStop(stop: RouteStopEntity): Long {
+        val id = routeStopDao.insert(stop)
+        liveCloudPush?.onRouteStopUpserted(id)
+        return id
+    }
+
+    suspend fun updateRouteStop(stop: RouteStopEntity) {
+        routeStopDao.update(stop)
+        liveCloudPush?.onRouteStopUpserted(stop.id)
+    }
+
+    suspend fun deleteRouteStop(stop: RouteStopEntity) {
+        val remoteId = stop.remoteId
+        routeStopDao.delete(stop)
+        liveCloudPush?.onRouteStopDeleted(remoteId)
+    }
+
+    suspend fun addRouteStopFromPlace(
+        tripId: Long,
+        title: String,
+        subtitle: String?,
+        lat: Double,
+        lng: Double,
+        osmPlaceId: String?,
+    ): Long {
+        val nextOrder = routeStopDao.maxSortOrder(tripId) + 1
+        val existing = routeStopDao.getByTrip(tripId)
+        val status = if (existing.isEmpty()) {
+            RouteStopStatus.CURRENT
+        } else {
+            RouteStopStatus.UPCOMING
+        }
+        return insertRouteStop(
+            RouteStopEntity(
+                tripId = tripId,
+                sortOrder = nextOrder,
+                title = title,
+                subtitle = subtitle,
+                lat = lat,
+                lng = lng,
+                osmPlaceId = osmPlaceId,
+                status = status,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    /** Mark stop reached and promote the next upcoming stop to current. */
+    suspend fun markRouteStopReached(stopId: Long) {
+        val stop = routeStopDao.getById(stopId) ?: return
+        if (stop.status == RouteStopStatus.REACHED) return
+        val now = System.currentTimeMillis()
+        updateRouteStop(stop.copy(status = RouteStopStatus.REACHED, updatedAt = now))
+        val remaining = routeStopDao.getByTrip(stop.tripId)
+            .filter { it.status != RouteStopStatus.REACHED }
+            .sortedBy { it.sortOrder }
+        val next = remaining.firstOrNull()
+        if (next != null && next.status != RouteStopStatus.CURRENT) {
+            updateRouteStop(next.copy(status = RouteStopStatus.CURRENT, updatedAt = now))
+        }
+        // Clear other CURRENT flags if any.
+        remaining.drop(1).filter { it.status == RouteStopStatus.CURRENT }.forEach { extra ->
+            updateRouteStop(extra.copy(status = RouteStopStatus.UPCOMING, updatedAt = now))
+        }
+    }
+
+    suspend fun setRouteTrackingActive(tripId: Long, active: Boolean) {
+        val trip = tripDao.getById(tripId) ?: return
+        updateTrip(
+            trip.copy(
+                routeTrackingActive = active,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun moveRouteStop(stopId: Long, direction: Int) {
+        val stop = routeStopDao.getById(stopId) ?: return
+        val all = routeStopDao.getByTrip(stop.tripId).sortedBy { it.sortOrder }
+        val index = all.indexOfFirst { it.id == stopId }
+        val targetIndex = index + direction
+        if (index < 0 || targetIndex !in all.indices) return
+        val other = all[targetIndex]
+        val now = System.currentTimeMillis()
+        updateRouteStop(stop.copy(sortOrder = other.sortOrder, updatedAt = now))
+        updateRouteStop(other.copy(sortOrder = stop.sortOrder, updatedAt = now))
+    }
+
+    /** Move a stop’s map pin to the given GPS (search pins are often town centers). */
+    suspend fun updateRouteStopLocation(stopId: Long, lat: Double, lng: Double) {
+        val stop = routeStopDao.getById(stopId) ?: return
+        updateRouteStop(
+            stop.copy(
+                lat = lat,
+                lng = lng,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
     suspend fun getTrip(id: Long): TripEntity? = tripDao.getById(id)
 
     suspend fun getMember(id: Long): MemberEntity? = memberDao.getById(id)
@@ -163,6 +270,23 @@ class TripRepository(
 
     suspend fun getExpenseByRemoteId(remoteId: String): ExpenseEntity? =
         expenseDao.getByRemoteId(remoteId)
+
+    suspend fun getAllRouteStops(): List<RouteStopEntity> = routeStopDao.getAll()
+
+    suspend fun getRouteStop(id: Long): RouteStopEntity? = routeStopDao.getById(id)
+
+    suspend fun getRouteStopByRemoteId(remoteId: String): RouteStopEntity? =
+        routeStopDao.getByRemoteId(remoteId)
+
+    suspend fun getRouteStopsForTrip(tripId: Long): List<RouteStopEntity> =
+        routeStopDao.getByTrip(tripId)
+
+    /** Trips currently running GPS route tracking. */
+    suspend fun getTripsWithRouteTracking(): List<TripEntity> =
+        tripDao.getAll().filter { it.routeTrackingActive }
+
+    fun observeTripsWithRouteTracking(): Flow<List<TripEntity>> =
+        tripDao.observeAll().map { trips -> trips.filter { it.routeTrackingActive } }
 
     /**
      * Persist sync fields without SQLite REPLACE.
@@ -204,6 +328,15 @@ class TripRepository(
         }
     }
 
+    suspend fun putRouteStopSynced(stop: RouteStopEntity): Long {
+        return if (stop.id == 0L) {
+            routeStopDao.insert(stop)
+        } else {
+            routeStopDao.update(stop)
+            stop.id
+        }
+    }
+
     suspend fun deleteSyncedTripsNotIn(keepRemoteIds: Collection<String>) {
         if (keepRemoteIds.isEmpty()) {
             tripDao.deleteAllSynced()
@@ -233,6 +366,14 @@ class TripRepository(
             expenseDao.deleteAllSynced()
         } else {
             expenseDao.deleteSyncedNotIn(keepRemoteIds.toList())
+        }
+    }
+
+    suspend fun deleteSyncedRouteStopsNotIn(keepRemoteIds: Collection<String>) {
+        if (keepRemoteIds.isEmpty()) {
+            routeStopDao.deleteAllSynced()
+        } else {
+            routeStopDao.deleteSyncedNotIn(keepRemoteIds.toList())
         }
     }
 

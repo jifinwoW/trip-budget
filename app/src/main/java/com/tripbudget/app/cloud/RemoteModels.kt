@@ -14,6 +14,22 @@ data class RemoteTrip(
     @SerialName("end_date_epoch_day") val endDateEpochDay: Long? = null,
     @SerialName("created_at_millis") val createdAtMillis: Long,
     @SerialName("invite_code") val inviteCode: String,
+    @SerialName("route_tracking_active") val routeTrackingActive: Boolean = false,
+    @SerialName("updated_at") val updatedAt: String,
+)
+
+@Serializable
+data class RemoteRouteStop(
+    val id: String,
+    @SerialName("trip_id") val tripId: String,
+    @SerialName("sort_order") val sortOrder: Int,
+    val title: String,
+    val subtitle: String? = null,
+    val lat: Double,
+    val lng: Double,
+    @SerialName("osm_place_id") val osmPlaceId: String? = null,
+    val status: String,
+    val note: String? = null,
     @SerialName("updated_at") val updatedAt: String,
 )
 

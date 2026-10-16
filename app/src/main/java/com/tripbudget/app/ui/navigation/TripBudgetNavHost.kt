@@ -3,13 +3,13 @@ package com.tripbudget.app.ui.navigation
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
@@ -58,15 +59,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tripbudget.app.R
@@ -77,12 +79,17 @@ import com.tripbudget.app.data.ThemePreferences
 import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.TripDates
+import com.tripbudget.app.location.RouteArrivalTracker
+import com.tripbudget.app.places.DeviceLocationWeather
+import com.tripbudget.app.places.WeatherKind
 import com.tripbudget.app.ui.TripSelectionUiState
 import com.tripbudget.app.ui.TripSelectionViewModel
 import com.tripbudget.app.ui.components.ConfirmDialog
 import com.tripbudget.app.ui.components.EmptyState
+import com.tripbudget.app.ui.components.HeaderWeatherAtmosphere
 import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.components.LoadingContent
+import com.tripbudget.app.ui.components.headerWashColors
 import com.tripbudget.app.ui.screens.auth.AuthBottomSheet
 import com.tripbudget.app.ui.screens.dashboard.DashboardScreen
 import com.tripbudget.app.ui.screens.dashboard.DashboardViewModel
@@ -90,6 +97,9 @@ import com.tripbudget.app.ui.screens.expenses.ExpensesScreen
 import com.tripbudget.app.ui.screens.expenses.ExpensesViewModel
 import com.tripbudget.app.ui.screens.members.MembersScreen
 import com.tripbudget.app.ui.screens.members.MembersViewModel
+import com.tripbudget.app.ui.screens.plan.PlanScreen
+import com.tripbudget.app.ui.screens.plan.PlanViewModel
+import com.tripbudget.app.ui.screens.plan.rememberRouteLocationPermissionLauncher
 import com.tripbudget.app.ui.screens.settings.SettingsScreen
 import com.tripbudget.app.ui.screens.settings.SettingsViewModel
 import com.tripbudget.app.ui.screens.trips.JoinTripDialog
@@ -100,6 +110,9 @@ import com.tripbudget.app.ui.theme.LoraFontFamily
 import kotlinx.coroutines.flow.map
 import kotlin.math.abs
 
+/** Extra sky below the toolbar so hero rounded corners sit on rain, not white. */
+private val HeaderWeatherUnderHero = 36.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripBudgetNavHost(
@@ -108,6 +121,7 @@ fun TripBudgetNavHost(
     authRepository: AuthRepository,
     syncEngine: SyncEngine,
     syncPreferences: SyncPreferences,
+    routeArrivalTracker: RouteArrivalTracker? = null,
 ) {
     val tripSelectionVm: TripSelectionViewModel = viewModel(
         factory = TripSelectionViewModel.factory(repository, syncEngine, authRepository),
@@ -119,12 +133,31 @@ fun TripBudgetNavHost(
     val dashboardVm: DashboardViewModel = viewModel(
         factory = DashboardViewModel.factory(repository, tripIdFlow),
     )
+    val planVm: PlanViewModel = viewModel(
+        factory = PlanViewModel.factory(repository, tripIdFlow),
+    )
     val expensesVm: ExpensesViewModel = viewModel(
         factory = ExpensesViewModel.factory(repository, tripIdFlow),
     )
     val membersVm: MembersViewModel = viewModel(
         factory = MembersViewModel.factory(repository, tripIdFlow),
     )
+    var hasLocationPermission by remember {
+        mutableStateOf(routeArrivalTracker?.hasLocationPermission() == true)
+    }
+    val locationPermissionLauncher = rememberRouteLocationPermissionLauncher { granted ->
+        hasLocationPermission = granted || routeArrivalTracker?.hasLocationPermission() == true
+        if (hasLocationPermission) {
+            routeArrivalTracker?.onPermissionGranted()
+        }
+    }
+    val emptyProximity = remember {
+        kotlinx.coroutines.flow.MutableStateFlow<com.tripbudget.app.location.NextStopProximity?>(null)
+    }
+    val routeProximity by (routeArrivalTracker?.proximity ?: emptyProximity)
+        .collectAsStateWithLifecycle()
+
+
     val settingsVm: SettingsViewModel = viewModel(
         factory = SettingsViewModel.factory(
             themePreferences = themePreferences,
@@ -149,6 +182,7 @@ fun TripBudgetNavHost(
     var showJoinTrip by remember { mutableStateOf(false) }
     var showAuthForCreate by remember { mutableStateOf(false) }
     var showSignIn by remember { mutableStateOf(false) }
+    var showRoutePlan by remember { mutableStateOf(false) }
     var tripMenuExpanded by remember { mutableStateOf(false) }
     var moreMenuExpanded by remember { mutableStateOf(false) }
 
@@ -165,6 +199,7 @@ fun TripBudgetNavHost(
             showAuthForCreate = false
             showSignIn = false
             showJoinTrip = false
+            showRoutePlan = false
             tripMenuExpanded = false
             moreMenuExpanded = false
         } else {
@@ -270,12 +305,47 @@ fun TripBudgetNavHost(
             if (selectedTrip == null) {
                 LoadingContent()
             } else {
+            val context = LocalContext.current
+            var headerWeatherKind by remember { mutableStateOf<WeatherKind?>(null) }
+            LaunchedEffect(hasLocationPermission) {
+                headerWeatherKind = if (hasLocationPermission) {
+                    DeviceLocationWeather.fetch(context)?.kind
+                } else {
+                    null
+                }
+            }
+            val headerSky = headerWashColors(headerWeatherKind, CoastalTokens.isDark)
+            val statusBarPad = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            // Extra under-hero strip only on Dashboard (rounded hero corners).
+            val weatherUnderHero =
+                if (pages[currentPage] == AppDestination.DASHBOARD) HeaderWeatherUnderHero else 0.dp
+            val weatherLayerHeight by animateDpAsState(
+                targetValue = statusBarPad + 56.dp + weatherUnderHero,
+                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                label = "header_weather_height",
+            )
             Box(modifier = Modifier.fillMaxSize()) {
+            // Weather sky behind toolbar; extends under hero corners on Dashboard only.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(weatherLayerHeight)
+                    .align(Alignment.TopCenter)
+                    .zIndex(0f)
+                    .background(Brush.verticalGradient(headerSky)),
+            ) {
+                HeaderWeatherAtmosphere(
+                    kind = headerWeatherKind,
+                    isDark = CoastalTokens.isDark,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
+                containerColor = Color.Transparent,
                 topBar = {
                     CoastalAppHeader(
                         state = tripState,
+                        weatherKind = headerWeatherKind,
                         tripMenuExpanded = tripMenuExpanded,
                         moreMenuExpanded = moreMenuExpanded,
                         onTripMenuExpandedChange = { tripMenuExpanded = it },
@@ -309,8 +379,8 @@ fun TripBudgetNavHost(
                         canDeleteTrip = tripState.selectedIsOwned,
                     )
                 },
+                modifier = Modifier.zIndex(1f),
             ) { padding ->
-                // Content fills the screen and scrolls under the floating capsule.
                 BoxWithConstraints(
                     modifier = Modifier
                         .padding(padding)
@@ -354,6 +424,8 @@ fun TripBudgetNavHost(
                                 DashboardScreen(
                                     trip = selectedTrip,
                                     viewModel = dashboardVm,
+                                    headerWeatherKind = headerWeatherKind,
+                                    weatherUnderHero = HeaderWeatherUnderHero,
                                     isRefreshing = isRefreshing,
                                     onRefresh = {
                                         tripSelectionVm.refreshFromCloud(force = true)
@@ -362,48 +434,106 @@ fun TripBudgetNavHost(
                                     onViewAllExpenses = {
                                         goToPage(AppDestination.EXPENSES)
                                     },
+                                    onOpenRoutePlan = { showRoutePlan = true },
                                 )
                             }
                             AppDestination.EXPENSES -> {
-                                ExpensesScreen(
-                                    tripId = selectedTrip.id,
-                                    viewModel = expensesVm,
-                                    isRefreshing = isRefreshing,
-                                    onRefresh = {
-                                        tripSelectionVm.refreshFromCloud(force = true)
-                                    },
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(CoastalTokens.canvas),
+                                ) {
+                                    ExpensesScreen(
+                                        tripId = selectedTrip.id,
+                                        viewModel = expensesVm,
+                                        isRefreshing = isRefreshing,
+                                        onRefresh = {
+                                            tripSelectionVm.refreshFromCloud(force = true)
+                                        },
+                                    )
+                                }
                             }
                             AppDestination.MEMBERS -> {
-                                MembersScreen(
-                                    tripId = selectedTrip.id,
-                                    viewModel = membersVm,
-                                    isRefreshing = isRefreshing,
-                                    onRefresh = {
-                                        tripSelectionVm.refreshFromCloud(force = true)
-                                    },
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(CoastalTokens.canvas),
+                                ) {
+                                    MembersScreen(
+                                        tripId = selectedTrip.id,
+                                        viewModel = membersVm,
+                                        isRefreshing = isRefreshing,
+                                        onRefresh = {
+                                            tripSelectionVm.refreshFromCloud(force = true)
+                                        },
+                                    )
+                                }
                             }
                             AppDestination.SETTINGS -> {
-                                SettingsScreen(
-                                    viewModel = settingsVm,
-                                    isRefreshing = isRefreshing,
-                                    onRefresh = {
-                                        tripSelectionVm.refreshFromCloud(force = true)
-                                    },
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(CoastalTokens.canvas),
+                                ) {
+                                    SettingsScreen(
+                                        viewModel = settingsVm,
+                                        isRefreshing = isRefreshing,
+                                        onRefresh = {
+                                            tripSelectionVm.refreshFromCloud(force = true)
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            SlidingBottomBar(
-                destinations = pages,
-                selectedIndex = currentPage,
-                onSelect = { currentPage = it },
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
+            if (!showRoutePlan) {
+                SlidingBottomBar(
+                    destinations = pages,
+                    selectedIndex = currentPage,
+                    onSelect = { currentPage = it },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .zIndex(2f),
+                )
+            }
+
+            if (showRoutePlan) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .zIndex(10f),
+                ) {
+                    PlanScreen(
+                        tripId = selectedTrip.id,
+                        viewModel = planVm,
+                        hasLocationPermission = hasLocationPermission,
+                        onRequestLocationPermission = {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                                ),
+                            )
+                        },
+                        onTrackingStarted = {
+                            routeArrivalTracker?.nudgeCheck()
+                        },
+                        onPinNextStopHere = {
+                            routeArrivalTracker?.pinNextStopToHere(selectedTrip.id)
+                        },
+                        onClose = { showRoutePlan = false },
+                        proximity = routeProximity,
+                        isRefreshing = isRefreshing,
+                        onRefresh = {
+                            tripSelectionVm.refreshFromCloud(force = true)
+                        },
+                    )
+                }
+            }
             }
 
             if (showAuthForCreate) {
@@ -482,13 +612,13 @@ fun TripBudgetNavHost(
 }
 
 /**
- * Showcase top bar (design image):
- * soft sky-blue/white cloud wash behind
- * TripBudget brand | white pill trip switcher | teal + | ⋮ more
+ * Coastal top bar: brand | trip switcher | actions,
+ * with live weather atmosphere behind (rain / storm / sun / …).
  */
 @Composable
 private fun CoastalAppHeader(
     state: TripSelectionUiState,
+    @Suppress("UNUSED_PARAMETER") weatherKind: WeatherKind?,
     tripMenuExpanded: Boolean,
     moreMenuExpanded: Boolean,
     onTripMenuExpandedChange: (Boolean) -> Unit,
@@ -501,43 +631,15 @@ private fun CoastalAppHeader(
     onDeleteTrip: () -> Unit,
     canDeleteTrip: Boolean,
 ) {
-    val headerColors = if (CoastalTokens.isDark) {
-        listOf(Color(0xFF12201E), Color(0xFF0E1A18), Color(0xFF0C1816))
-    } else {
-        listOf(Color(0xFFD4EBF5), Color(0xFFE8F4FA), Color(0xFFF5FBFC))
-    }
+    // Sky / rain is drawn once behind the Scaffold; header stays transparent.
     val ownedPillBg = if (CoastalTokens.isDark) Color(0xFF1A3D38) else Color(0xFFE8F6F5)
     val joinedPillBorder = MaterialTheme.colorScheme.outlineVariant
     val accent = CoastalTokens.accent
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(colors = headerColors)),
+            .background(Color.Transparent),
     ) {
-        // Soft cloud patches mixed into the sky wash (dimmer in dark mode).
-        val cloudAlphaScale = if (CoastalTokens.isDark) 0.12f else 1f
-        Canvas(modifier = Modifier.matchParentSize()) {
-            fun cloud(cx: Float, cy: Float, radius: Float, alpha: Float) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = alpha * cloudAlphaScale),
-                            Color.White.copy(alpha = 0f),
-                        ),
-                        center = Offset(cx, cy),
-                        radius = radius,
-                    ),
-                    radius = radius,
-                    center = Offset(cx, cy),
-                )
-            }
-            cloud(size.width * 0.12f, size.height * 0.55f, size.minDimension * 0.55f, 0.7f)
-            cloud(size.width * 0.38f, size.height * 0.35f, size.minDimension * 0.42f, 0.55f)
-            cloud(size.width * 0.68f, size.height * 0.6f, size.minDimension * 0.5f, 0.6f)
-            cloud(size.width * 0.92f, size.height * 0.4f, size.minDimension * 0.38f, 0.5f)
-            cloud(size.width * 0.55f, size.height * 0.85f, size.minDimension * 0.35f, 0.4f)
-        }
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()

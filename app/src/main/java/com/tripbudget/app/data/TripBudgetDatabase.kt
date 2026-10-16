@@ -8,10 +8,12 @@ import androidx.room.TypeConverters
 import com.tripbudget.app.data.dao.ContributionDao
 import com.tripbudget.app.data.dao.ExpenseDao
 import com.tripbudget.app.data.dao.MemberDao
+import com.tripbudget.app.data.dao.RouteStopDao
 import com.tripbudget.app.data.dao.TripDao
 import com.tripbudget.app.data.entity.ContributionEntity
 import com.tripbudget.app.data.entity.ExpenseEntity
 import com.tripbudget.app.data.entity.MemberEntity
+import com.tripbudget.app.data.entity.RouteStopEntity
 import com.tripbudget.app.data.entity.TripEntity
 
 @Database(
@@ -20,8 +22,9 @@ import com.tripbudget.app.data.entity.TripEntity
         MemberEntity::class,
         ContributionEntity::class,
         ExpenseEntity::class,
+        RouteStopEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -30,6 +33,7 @@ abstract class TripBudgetDatabase : RoomDatabase() {
     abstract fun memberDao(): MemberDao
     abstract fun contributionDao(): ContributionDao
     abstract fun expenseDao(): ExpenseDao
+    abstract fun routeStopDao(): RouteStopDao
 
     companion object {
         fun create(context: Context): TripBudgetDatabase {
@@ -43,6 +47,7 @@ abstract class TripBudgetDatabase : RoomDatabase() {
                     Migrations.MIGRATION_2_3,
                     Migrations.MIGRATION_3_4,
                     Migrations.MIGRATION_4_5,
+                    Migrations.MIGRATION_5_6,
                 )
                 // Do not use fallbackToDestructiveMigration — that erases user data.
                 .build()
