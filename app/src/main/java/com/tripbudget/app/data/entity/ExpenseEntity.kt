@@ -23,7 +23,7 @@ import com.tripbudget.app.domain.PaymentSource
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("tripId"), Index("paidByMemberId")],
+    indices = [Index("tripId"), Index("paidByMemberId"), Index(value = ["remoteId"], unique = true)],
 )
 data class ExpenseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -36,4 +36,6 @@ data class ExpenseEntity(
     val paidByMemberId: Long? = null,
     val paymentSource: PaymentSource,
     val notes: String? = null,
+    val remoteId: String? = null,
+    val updatedAt: Long = System.currentTimeMillis(),
 )

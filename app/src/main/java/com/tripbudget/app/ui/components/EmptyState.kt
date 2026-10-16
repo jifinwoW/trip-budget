@@ -22,6 +22,8 @@ fun EmptyState(
     message: String,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     SoftScreenCanvas(modifier = modifier) {
@@ -67,6 +69,16 @@ fun EmptyState(
                     PrimaryCoastalButton(
                         text = actionLabel,
                         onClick = onAction,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    )
+                }
+            }
+            if (secondaryActionLabel != null && onSecondaryAction != null) {
+                Spacer(Modifier.height(10.dp))
+                EnterCascade(180) {
+                    SecondaryCoastalButton(
+                        text = secondaryActionLabel,
+                        onClick = onSecondaryAction,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                     )
                 }

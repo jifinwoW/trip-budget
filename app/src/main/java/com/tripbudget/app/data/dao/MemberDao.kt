@@ -17,10 +17,16 @@ interface MemberDao {
     @Query("SELECT * FROM members WHERE tripId = :tripId ORDER BY name COLLATE NOCASE ASC")
     suspend fun getByTrip(tripId: Long): List<MemberEntity>
 
+    @Query("SELECT * FROM members")
+    suspend fun getAll(): List<MemberEntity>
+
     @Query("SELECT * FROM members WHERE id = :id")
     suspend fun getById(id: Long): MemberEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Query("SELECT * FROM members WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun getByRemoteId(remoteId: String): MemberEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(member: MemberEntity): Long
 
     @Update
@@ -28,4 +34,10 @@ interface MemberDao {
 
     @Delete
     suspend fun delete(member: MemberEntity)
+
+    @Query("DELETE FROM members WHERE remoteId IS NOT NULL AND remoteId NOT IN (:keepRemoteIds)")
+    suspend fun deleteSyncedNotIn(keepRemoteIds: List<String>)
+
+    @Query("DELETE FROM members WHERE remoteId IS NOT NULL")
+    suspend fun deleteAllSynced()
 }

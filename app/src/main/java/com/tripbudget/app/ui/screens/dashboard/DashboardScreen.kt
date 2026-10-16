@@ -59,6 +59,7 @@ import com.tripbudget.app.domain.TripDates
 import com.tripbudget.app.ui.components.CategoryIcon
 import com.tripbudget.app.ui.components.EnterCascade
 import com.tripbudget.app.ui.components.ExpenseSourceChip
+import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.components.LoadingContent
 import com.tripbudget.app.ui.components.PremiumMetricTile
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
@@ -77,6 +78,8 @@ import java.time.LocalDate
 fun DashboardScreen(
     trip: TripEntity,
     viewModel: DashboardViewModel,
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
     onEditTrip: () -> Unit = {},
     onViewAllExpenses: () -> Unit = {},
 ) {
@@ -131,7 +134,9 @@ fun DashboardScreen(
     }.coerceAtLeast(0f)
 
     // Showcase layout: photo hero → sky-mist sheet with rounded top overlapping it.
-    Box(
+    LivePullRefresh(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5FBFC)),
@@ -415,6 +420,8 @@ fun DashboardScreen(
                     }
                 }
                 }
+                // Room to scroll past the floating nav capsule.
+                Spacer(Modifier.height(100.dp))
             }
         }
     }

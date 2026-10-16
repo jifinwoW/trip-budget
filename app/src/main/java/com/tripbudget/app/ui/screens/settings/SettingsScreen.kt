@@ -15,12 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.Icon
@@ -28,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tripbudget.app.R
 import com.tripbudget.app.data.ThemeMode
 import com.tripbudget.app.ui.components.EnterCascade
+import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.components.SoftScreenCanvas
 import com.tripbudget.app.ui.theme.LoraFontFamily
 import com.tripbudget.app.ui.theme.Teal100
@@ -56,9 +57,16 @@ import com.tripbudget.app.ui.theme.Teal700
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val cloud by viewModel.cloud.collectAsStateWithLifecycle()
 
+    LivePullRefresh(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+    ) {
     SoftScreenCanvas {
         Column(
             modifier = Modifier
@@ -81,7 +89,45 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            EnterCascade(40) {
+            if (cloud.user != null) {
+                EnterCascade(40) {
+                    Text(
+                        "Account",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFF5A6F6A),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White)
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            cloud.user?.email?.takeIf { it.isNotBlank() }
+                                ?: "Joined as guest",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF1A2B28),
+                        )
+                        cloud.message?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = Teal700)
+                        }
+                        TextButton(
+                            onClick = viewModel::signOut,
+                            enabled = !cloud.busy,
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                        ) {
+                            Text("Sign out")
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+
+            EnterCascade(80) {
                 Text(
                     "Appearance",
                     style = MaterialTheme.typography.titleMedium,
@@ -113,13 +159,15 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            EnterCascade(80) {
-                AboutSection()
+            EnterCascade(120) {
+                AboutSection(
+                    hasAccount = !cloud.user?.email.isNullOrBlank(),
+                )
             }
 
             Spacer(Modifier.height(14.dp))
 
-            EnterCascade(120) {
+            EnterCascade(160) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -156,12 +204,17 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(16.dp))
+            // Room to scroll past the floating nav capsule.
+            Spacer(Modifier.height(100.dp))
         }
+    }
     }
 }
 
 @Composable
-private fun AboutSection() {
+private fun AboutSection(
+    hasAccount: Boolean,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -215,7 +268,7 @@ private fun AboutSection() {
         }
 
         Text(
-            text = "Offline personal trip budget tracker.",
+            text = "Everything stays live in the cloud. Swipe down any page to refresh.",
             style = MaterialTheme.typography.bodySmall,
             color = Color(0xFF5A6F6A),
         )
@@ -230,13 +283,13 @@ private fun AboutSection() {
                 modifier = Modifier.weight(1f),
             )
             AboutChip(
-                icon = Icons.Outlined.CloudOff,
-                label = "On device",
+                icon = Icons.Outlined.Cloud,
+                label = "Live",
                 modifier = Modifier.weight(1f),
             )
             AboutChip(
-                icon = Icons.Outlined.Lock,
-                label = "No account",
+                icon = if (hasAccount) Icons.Outlined.Cloud else Icons.Outlined.Lock,
+                label = if (hasAccount) "Online" else "Join OK",
                 modifier = Modifier.weight(1f),
             )
         }

@@ -61,4 +61,49 @@ object Migrations {
             db.execSQL("ALTER TABLE `trips` ADD COLUMN `endDateEpochDay` INTEGER")
         }
     }
+
+    /** v3 → v4: Supabase sync fields (remoteId + updatedAt) on all entities. */
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `trips` ADD COLUMN `remoteId` TEXT")
+            db.execSQL(
+                "ALTER TABLE `trips` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_trips_remoteId` ON `trips` (`remoteId`)",
+            )
+
+            db.execSQL("ALTER TABLE `members` ADD COLUMN `remoteId` TEXT")
+            db.execSQL(
+                "ALTER TABLE `members` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_members_remoteId` ON `members` (`remoteId`)",
+            )
+
+            db.execSQL("ALTER TABLE `contributions` ADD COLUMN `remoteId` TEXT")
+            db.execSQL(
+                "ALTER TABLE `contributions` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_contributions_remoteId` ON `contributions` (`remoteId`)",
+            )
+
+            db.execSQL("ALTER TABLE `expenses` ADD COLUMN `remoteId` TEXT")
+            db.execSQL(
+                "ALTER TABLE `expenses` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_expenses_remoteId` ON `expenses` (`remoteId`)",
+            )
+        }
+    }
+
+    /** v4 → v5: trip sharing fields (remote owner + invite code). */
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `trips` ADD COLUMN `remoteOwnerId` TEXT")
+            db.execSQL("ALTER TABLE `trips` ADD COLUMN `inviteCode` TEXT")
+        }
+    }
 }

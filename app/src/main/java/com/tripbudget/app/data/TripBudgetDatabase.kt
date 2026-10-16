@@ -21,7 +21,7 @@ import com.tripbudget.app.data.entity.TripEntity
         ContributionEntity::class,
         ExpenseEntity::class,
     ],
-    version = 3,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -38,7 +38,12 @@ abstract class TripBudgetDatabase : RoomDatabase() {
                 TripBudgetDatabase::class.java,
                 "trip_budget.db",
             )
-                .addMigrations(Migrations.MIGRATION_1_2, Migrations.MIGRATION_2_3)
+                .addMigrations(
+                    Migrations.MIGRATION_1_2,
+                    Migrations.MIGRATION_2_3,
+                    Migrations.MIGRATION_3_4,
+                    Migrations.MIGRATION_4_5,
+                )
                 // Do not use fallbackToDestructiveMigration — that erases user data.
                 .build()
         }

@@ -1,9 +1,22 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+fun escapeBuildConfig(value: String): String =
+    value.replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace = "com.tripbudget.app"
@@ -16,6 +29,20 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Add to local.properties (gitignored):
+        // SUPABASE_URL=https://xxxx.supabase.co
+        // SUPABASE_ANON_KEY=eyJ...
+        buildConfigField(
+            "String",
+            "SUPABASE_URL",
+            "\"${escapeBuildConfig(localProperties.getProperty("SUPABASE_URL", ""))}\"",
+        )
+        buildConfigField(
+            "String",
+            "SUPABASE_ANON_KEY",
+            "\"${escapeBuildConfig(localProperties.getProperty("SUPABASE_ANON_KEY", ""))}\"",
+        )
     }
 
     buildTypes {
@@ -23,7 +50,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -39,6 +66,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -76,6 +104,14 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    val supabaseBom = platform("io.github.jan-tennert.supabase:bom:3.1.1")
+    implementation(supabaseBom)
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.github.jan-tennert.supabase:realtime-kt")
+    implementation("io.ktor:ktor-client-android:3.0.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")

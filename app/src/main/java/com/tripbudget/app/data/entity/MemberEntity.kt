@@ -15,11 +15,13 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("tripId")],
+    indices = [Index("tripId"), Index(value = ["remoteId"], unique = true)],
 )
 data class MemberEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val tripId: Long,
     val name: String,
     val expectedContributionPaise: Long,
+    val remoteId: String? = null,
+    val updatedAt: Long = System.currentTimeMillis(),
 )

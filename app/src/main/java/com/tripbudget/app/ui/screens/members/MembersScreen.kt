@@ -25,7 +25,6 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -48,8 +47,11 @@ import com.tripbudget.app.data.entity.ContributionEntity
 import com.tripbudget.app.data.entity.MemberEntity
 import com.tripbudget.app.domain.MemberBalance
 import com.tripbudget.app.domain.Money
+import com.tripbudget.app.ui.components.CoastalProgressTeal
+import com.tripbudget.app.ui.components.CoastalProgressTrack
 import com.tripbudget.app.ui.components.ConfirmDialog
 import com.tripbudget.app.ui.components.EmptyState
+import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.components.LoadingContent
 import com.tripbudget.app.ui.components.MemberAvatar
 import com.tripbudget.app.ui.components.MemberStatusBadge
@@ -67,6 +69,8 @@ import java.time.format.DateTimeFormatter
 fun MembersScreen(
     tripId: Long,
     viewModel: MembersViewModel,
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddMember by remember { mutableStateOf(false) }
@@ -104,16 +108,20 @@ fun MembersScreen(
             }
         },
     ) { padding ->
+        LivePullRefresh(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.padding(padding),
+        ) {
         if (state.balances.isEmpty()) {
             EmptyState(
                 title = "No members yet",
                 message = "Add people and set how much each should contribute.",
                 actionLabel = "Add member",
                 onAction = { showAddMember = true },
-                modifier = Modifier.padding(padding),
             )
         } else {
-            SoftScreenCanvas(modifier = Modifier.padding(padding)) {
+            SoftScreenCanvas {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
@@ -146,19 +154,14 @@ fun MembersScreen(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                "of ${Money.formatInr(expectedTotal)} expected · ${(collectedProgress.coerceAtMost(1f) * 100).toInt()}%",
+                                "of ${Money.formatInr(expectedTotal)} expected · ${(collectedProgress * 100f).toInt().coerceAtLeast(0)}%",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color(0xFF5A6F6A),
                             )
                             Spacer(Modifier.height(4.dp))
-                            LinearProgressIndicator(
-                                progress = { collectedProgress.coerceIn(0f, 1f) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp)
-                                    .clip(RoundedCornerShape(999.dp)),
-                                color = Teal600,
-                                trackColor = Color(0xFFE8EEF0),
+                            CoastalProgressTrack(
+                                progress = collectedProgress,
+                                fillColor = CoastalProgressTeal,
                             )
                         }
                     }
@@ -179,9 +182,10 @@ fun MembersScreen(
                             onDeleteContribution = { deletingContribution = it },
                         )
                     }
-                    item { Spacer(Modifier.height(72.dp)) }
+                    item { Spacer(Modifier.height(100.dp)) }
                 }
             }
+        }
         }
     }
 
@@ -328,18 +332,10 @@ private fun MemberCard(
             color = balanceColor,
         )
 
-        LinearProgressIndicator(
-            progress = { memberProgress.coerceIn(0f, 1f) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(7.dp)
-                .clip(RoundedCornerShape(999.dp)),
-            color = when {
-                balance.hasExcess -> Teal600
-                balance.outstandingPaise > 0 -> Color(0xFFE0A060)
-                else -> CoastalTokens.settled
-            },
-            trackColor = Color(0xFFE8EEF0),
+        CoastalProgressTrack(
+            progress = memberProgress,
+            fillColor = CoastalProgressTeal,
+            height = 7.dp,
         )
 
         Row(

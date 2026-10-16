@@ -21,7 +21,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("tripId"), Index("memberId")],
+    indices = [Index("tripId"), Index("memberId"), Index(value = ["remoteId"], unique = true)],
 )
 data class ContributionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -30,4 +30,6 @@ data class ContributionEntity(
     val amountPaise: Long,
     val paidAt: Long = System.currentTimeMillis(),
     val note: String? = null,
+    val remoteId: String? = null,
+    val updatedAt: Long = System.currentTimeMillis(),
 )

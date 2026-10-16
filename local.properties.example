@@ -1,6 +1,9 @@
-## Copy to local.properties and set your Android SDK path.
+## Copy these into local.properties (gitignored). Do not put real secrets here.
 ## Example (Linux):
 # sdk.dir=/home/YOU/Android/Sdk
 ## Example (macOS):
 # sdk.dir=/Users/YOU/Library/Android/sdk
+
 sdk.dir=/path/to/Android/sdk
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_ANON_KEY=your_anon_public_key

@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tripbudget.app.R
@@ -308,13 +309,49 @@ fun SoftProgressCard(
             label = "Budget used",
             percentLabel = "$budgetPct%",
             progress = budgetUsed.coerceIn(0f, 1f),
-            fillColor = if (overBudget) CoastalTokens.negative else Color(0xFF0D8B8A),
+            fillColor = if (overBudget) CoastalTokens.negative else CoastalProgressTeal,
         )
         ShowcaseProgressBar(
             label = "Contributions collected",
             percentLabel = "$collectedPct%",
             progress = collectedProgress.coerceIn(0f, 1f),
-            fillColor = Color(0xFF0D8B8A),
+            fillColor = CoastalProgressTeal,
+        )
+    }
+}
+
+/** Same teal used on dashboard progress fills. */
+val CoastalProgressTeal: Color = Color(0xFF0D8B8A)
+
+/**
+ * Custom pill progress track (not Material LinearProgressIndicator).
+ * Avoids M3 stop-indicator / clip glitches; fill clamps to 0–100%.
+ */
+@Composable
+fun CoastalProgressTrack(
+    progress: Float,
+    fillColor: Color = CoastalProgressTeal,
+    modifier: Modifier = Modifier,
+    trackColor: Color = Color(0xFFDCEAE6),
+    height: Dp = 8.dp,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(RoundedCornerShape(999.dp))
+            .background(trackColor),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction = progress.coerceIn(0f, 1f))
+                .height(height)
+                .clip(RoundedCornerShape(999.dp))
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(fillColor, fillColor.copy(alpha = 0.85f)),
+                    ),
+                ),
         )
     }
 }
@@ -347,24 +384,9 @@ private fun ShowcaseProgressBar(
             )
         }
         Spacer(Modifier.height(8.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(Color(0xFFDCEAE6)),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction = progress.coerceIn(0f, 1f))
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(fillColor, fillColor.copy(alpha = 0.85f)),
-                        ),
-                    ),
-            )
-        }
+        CoastalProgressTrack(
+            progress = progress,
+            fillColor = fillColor,
+        )
     }
 }

@@ -50,6 +50,7 @@ import com.tripbudget.app.domain.PaymentSource
 import com.tripbudget.app.ui.components.CategoryIcon
 import com.tripbudget.app.ui.components.ConfirmDialog
 import com.tripbudget.app.ui.components.EmptyState
+import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.components.LoadingContent
 import com.tripbudget.app.ui.components.SoftScreenCanvas
 import com.tripbudget.app.ui.theme.Teal100
@@ -64,6 +65,8 @@ private enum class ExpenseFilter { ALL, SHARED, PERSONAL }
 fun ExpensesScreen(
     tripId: Long,
     viewModel: ExpensesViewModel,
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdd by remember { mutableStateOf(false) }
@@ -122,16 +125,20 @@ fun ExpensesScreen(
             }
         },
     ) { padding ->
+        LivePullRefresh(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.padding(padding),
+        ) {
         if (state.expenses.isEmpty()) {
             EmptyState(
                 title = "No expenses yet",
                 message = "Record food, fuel, stays, and other trip costs.",
                 actionLabel = "Add expense",
                 onAction = { showAdd = true },
-                modifier = Modifier.padding(padding),
             )
         } else {
-            SoftScreenCanvas(modifier = Modifier.padding(padding)) {
+            SoftScreenCanvas {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
@@ -238,9 +245,10 @@ fun ExpensesScreen(
                             }
                         }
                     }
-                    item { Spacer(Modifier.height(80.dp)) }
+                    item { Spacer(Modifier.height(100.dp)) }
                 }
             }
+        }
         }
     }
 
