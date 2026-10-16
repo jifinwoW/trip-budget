@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.tripbudget.app.domain.Money
 import com.tripbudget.app.ui.theme.CoastalTokens
-import com.tripbudget.app.ui.theme.Teal700
 
 @Composable
 fun SoftChip(
@@ -95,19 +94,19 @@ fun HeroCashTile(
     amountPaise: Long,
     subtitle: String,
     modifier: Modifier = Modifier,
-    amountColor: Color = Teal700,
+    amountColor: Color = CoastalTokens.tealSoftFg,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
-            .background(CoastalTokens.mintHero)
+            .background(CoastalTokens.tealSoft)
             .padding(horizontal = 20.dp, vertical = 22.dp),
     ) {
         Text(
             text = "SHARED CASH",
             style = MaterialTheme.typography.labelLarge,
-            color = Teal700.copy(alpha = 0.75f),
+            color = CoastalTokens.tealSoftFg.copy(alpha = 0.75f),
         )
         Text(
             text = Money.formatInr(amountPaise),
@@ -118,7 +117,7 @@ fun HeroCashTile(
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
-            color = Teal700.copy(alpha = 0.7f),
+            color = CoastalTokens.tealSoftFg.copy(alpha = 0.7f),
             modifier = Modifier.padding(top = 4.dp),
         )
     }

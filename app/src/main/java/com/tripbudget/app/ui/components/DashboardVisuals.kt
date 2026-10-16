@@ -39,8 +39,6 @@ import androidx.compose.ui.unit.sp
 import com.tripbudget.app.R
 import com.tripbudget.app.domain.Money
 import com.tripbudget.app.ui.theme.CoastalTokens
-import com.tripbudget.app.ui.theme.Teal600
-import com.tripbudget.app.ui.theme.Teal700
 
 /** Clean dashboard canvas — subtle tinted wash with floating soft orbs. */
 @Composable
@@ -48,15 +46,18 @@ fun SoftDashboardCanvas(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val canvas = CoastalTokens.canvas
+    val orbAlpha = if (CoastalTokens.isDark) 0.10f else 0.22f
+    val warmAlpha = if (CoastalTokens.isDark) 0.08f else 0.18f
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF6F9FA)),
+            .background(canvas),
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF7ED9C8).copy(alpha = 0.22f), Color.Transparent),
+                    colors = listOf(Color(0xFF7ED9C8).copy(alpha = orbAlpha), Color.Transparent),
                     center = Offset(size.width * 0.08f, size.height * 0.04f),
                     radius = size.minDimension * 0.45f,
                 ),
@@ -65,7 +66,7 @@ fun SoftDashboardCanvas(
             )
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFE8D4B8).copy(alpha = 0.18f), Color.Transparent),
+                    colors = listOf(Color(0xFFE8D4B8).copy(alpha = warmAlpha), Color.Transparent),
                     center = Offset(size.width * 0.95f, size.height * 0.12f),
                     radius = size.minDimension * 0.35f,
                 ),
@@ -175,9 +176,14 @@ fun IconMetricTile(
     tint: Color,
     iconTint: Color,
     modifier: Modifier = Modifier,
-    amountColor: Color = Color(0xFF1A2B28),
+    amountColor: Color = CoastalTokens.ink,
     @DrawableRes backgroundRes: Int? = null,
 ) {
+    val iconPlate = if (CoastalTokens.isDark) {
+        Color.White.copy(alpha = 0.12f)
+    } else {
+        Color.White.copy(alpha = 0.78f)
+    }
     Box(
         modifier = modifier
             .shadow(3.dp, RoundedCornerShape(16.dp), clip = false)
@@ -205,7 +211,7 @@ fun IconMetricTile(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White.copy(alpha = 0.78f)),
+                    .background(iconPlate),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -247,7 +253,7 @@ fun OverviewIconChip(
         modifier = modifier
             .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
             .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
+            .background(CoastalTokens.card)
             .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -270,12 +276,12 @@ fun OverviewIconChip(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = CoastalTokens.muted,
             )
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = CoastalTokens.ink,
             )
         }
     }
@@ -301,7 +307,7 @@ fun SoftProgressCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFFF3FAF8))
+            .background(CoastalTokens.softFill)
             .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -309,18 +315,18 @@ fun SoftProgressCard(
             label = "Budget used",
             percentLabel = "$budgetPct%",
             progress = budgetUsed.coerceIn(0f, 1f),
-            fillColor = if (overBudget) CoastalTokens.negative else CoastalProgressTeal,
+            fillColor = if (overBudget) CoastalTokens.danger else CoastalTokens.progressFill,
         )
         ShowcaseProgressBar(
             label = "Contributions collected",
             percentLabel = "$collectedPct%",
             progress = collectedProgress.coerceIn(0f, 1f),
-            fillColor = CoastalProgressTeal,
+            fillColor = CoastalTokens.progressFill,
         )
     }
 }
 
-/** Same teal used on dashboard progress fills. */
+/** Same teal used on dashboard progress fills (light-mode default). */
 val CoastalProgressTeal: Color = Color(0xFF0D8B8A)
 
 /**
@@ -330,9 +336,9 @@ val CoastalProgressTeal: Color = Color(0xFF0D8B8A)
 @Composable
 fun CoastalProgressTrack(
     progress: Float,
-    fillColor: Color = CoastalProgressTeal,
+    fillColor: Color = CoastalTokens.progressFill,
     modifier: Modifier = Modifier,
-    trackColor: Color = Color(0xFFDCEAE6),
+    trackColor: Color = CoastalTokens.progressTrack,
     height: Dp = 8.dp,
 ) {
     Box(
@@ -373,14 +379,14 @@ private fun ShowcaseProgressBar(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFF5A6F6A),
+                color = CoastalTokens.muted,
                 maxLines = 2,
             )
             Text(
                 text = percentLabel,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1A2B28),
+                color = CoastalTokens.ink,
             )
         }
         Spacer(Modifier.height(8.dp))

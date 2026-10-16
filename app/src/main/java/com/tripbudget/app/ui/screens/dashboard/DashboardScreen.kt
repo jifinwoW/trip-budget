@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +46,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -72,6 +74,7 @@ import com.tripbudget.app.ui.screens.expenses.ExpenseEditorDialog
 import com.tripbudget.app.ui.screens.members.ContributionEditorDialog
 import com.tripbudget.app.ui.theme.CoastalTokens
 import com.tripbudget.app.ui.theme.Teal600
+import com.tripbudget.app.ui.theme.floatingNavContentPadding
 import java.time.LocalDate
 
 @Composable
@@ -108,15 +111,27 @@ fun DashboardScreen(
     }
 
     val sharedColor = if (totals.sharedCashRemainingPaise < 0) {
-        Color(0xFFFFD4CE)
+        if (CoastalTokens.isDark) Color(0xFFFFB4A8) else Color(0xFFFFD4CE)
     } else {
         Color.White
     }
     val budgetAmountColor = if (totals.isOverBudget) {
-        CoastalTokens.negative
+        CoastalTokens.danger
     } else {
-        Color(0xFF1A2B28)
+        CoastalTokens.ink
     }
+    val mintTile = CoastalTokens.tileMint()
+    val roseTile = CoastalTokens.tileRose()
+    val blueTile = CoastalTokens.tileBlue()
+    val sandTile = CoastalTokens.tileSand()
+    val peachTile = CoastalTokens.tilePeach()
+    val warmTile = CoastalTokens.tileWarm()
+    val sheetColors = if (CoastalTokens.isDark) {
+        listOf(Color(0xFF12201E), Color(0xFF0E1A18), Color(0xFF0C1816))
+    } else {
+        listOf(Color(0xFFF7FCFD), Color(0xFFEAF4F8), Color(0xFFF5FBFC))
+    }
+    val mistStrength = if (CoastalTokens.isDark) 0.18f else 1f
 
     // Progress logic (same as design):
     // Budget used % = total expenses / planned budget
@@ -133,19 +148,36 @@ fun DashboardScreen(
         0f
     }.coerceAtLeast(0f)
 
-    // Showcase layout: photo hero → sky-mist sheet with rounded top overlapping it.
+    // Fixed hero; sheet + tiles keep the same look and scroll up over it.
+    val heroHeight = 210.dp
+    val heroOverlap = 24.dp
+    val scrollState = rememberScrollState()
+    val density = LocalDensity.current
+    val chipStayInteractivePx = with(density) { 40.dp.roundToPx() }
+    val zoomRangePx = with(density) { 240.dp.roundToPx() }.coerceAtLeast(1)
+    // Chip stays fixed on the hero; sits above the scroll layer only while still visible.
+    val budgetChipOnTop = scrollState.value < chipStayInteractivePx
+    // Subtle Ken Burns zoom + drift as content scrolls over the hero.
+    val heroImageZoom by remember(zoomRangePx) {
+        derivedStateOf {
+            val progress = (scrollState.value.toFloat() / zoomRangePx).coerceIn(0f, 1f)
+            1f + progress * 0.50f
+        }
+    }
+    val heroImageOffsetY by remember {
+        derivedStateOf {
+            // Ease the photo upward a little so zoom feels anchored, not clipped oddly.
+            (-scrollState.value * 0.18f).coerceIn(-90f, 0f)
+        }
+    }
     LivePullRefresh(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5FBFC)),
+            .background(CoastalTokens.canvas),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             EnterCascade(0) {
                 TripScenicHeader(
                     tripName = trip.name,
@@ -153,31 +185,35 @@ fun DashboardScreen(
                     dateRange = TripDates.formatRange(trip),
                     plannedBudgetPaise = totals.plannedBudgetPaise,
                     onEditBudget = onEditTrip,
+                    showBudgetChip = false,
+                    imageZoom = heroImageZoom,
+                    imageOffsetY = heroImageOffsetY,
+                    modifier = Modifier.align(Alignment.TopCenter),
                 )
             }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(1f)
+                    .verticalScroll(scrollState),
+            ) {
+            // Same visual tuck as before: sheet starts 24dp up into the hero.
+            Spacer(Modifier.height(heroHeight - heroOverlap))
 
             // Soft sky-blue + white mist sheet behind Shared Cash / tiles / buttons.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .offset(y = (-24).dp)
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFFF7FCFD),
-                                Color(0xFFEAF4F8),
-                                Color(0xFFF5FBFC),
-                            ),
-                        ),
-                    ),
+                    .background(Brush.verticalGradient(colors = sheetColors)),
             ) {
                 Canvas(modifier = Modifier.matchParentSize()) {
                     fun mist(cx: Float, cy: Float, radius: Float, color: Color, alpha: Float) {
                         drawCircle(
                             brush = Brush.radialGradient(
                                 colors = listOf(
-                                    color.copy(alpha = alpha),
+                                    color.copy(alpha = alpha * mistStrength),
                                     color.copy(alpha = 0f),
                                 ),
                                 center = Offset(cx, cy),
@@ -200,7 +236,7 @@ fun DashboardScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
-                        .padding(top = 20.dp, bottom = 28.dp),
+                        .padding(top = 20.dp, bottom = 12.dp),
                 ) {
                 EnterCascade(40) {
                     SoftProgressCard(
@@ -217,22 +253,22 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFFFCE8E4))
+                                .background(CoastalTokens.dangerSoft)
                                 .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Icon(Icons.Outlined.TrendingDown, null, tint = CoastalTokens.negative)
+                            Icon(Icons.Outlined.TrendingDown, null, tint = CoastalTokens.danger)
                             Column {
                                 Text(
                                     "Over budget",
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = CoastalTokens.negative,
+                                    color = CoastalTokens.danger,
                                 )
                                 Text(
                                     Money.formatInr(-totals.budgetRemainingPaise) + " over plan",
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = Color(0xFF5C180C),
+                                    color = if (CoastalTokens.isDark) Color(0xFFFFB4A8) else Color(0xFF5C180C),
                                 )
                             }
                         }
@@ -262,18 +298,20 @@ fun DashboardScreen(
                                 label = "Collected",
                                 amountPaise = totals.contributionsCollectedPaise,
                                 icon = Icons.Outlined.Payments,
-                                tileColor = Color(0xFFD8F3EE),
-                                iconBg = Color(0xFFB5E6DC),
-                                iconTint = Color(0xFF0D8B8A),
+                                tileColor = mintTile.background,
+                                iconBg = mintTile.iconBg,
+                                iconTint = mintTile.iconTint,
+                                amountColor = mintTile.amount,
                                 modifier = Modifier.weight(1f),
                             )
                             PremiumMetricTile(
                                 label = "Shared spent",
                                 amountPaise = totals.sharedExpensesPaise,
                                 icon = Icons.Outlined.ShoppingBag,
-                                tileColor = Color(0xFFF6DCE0),
-                                iconBg = Color(0xFFF0C4CA),
-                                iconTint = Color(0xFFC45B66),
+                                tileColor = roseTile.background,
+                                iconBg = roseTile.iconBg,
+                                iconTint = roseTile.iconTint,
+                                amountColor = roseTile.amount,
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -290,9 +328,9 @@ fun DashboardScreen(
                             label = "Budget left",
                             amountPaise = totals.budgetRemainingPaise,
                             icon = Icons.Outlined.Savings,
-                            tileColor = Color(0xFFD7EAF7),
-                            iconBg = Color(0xFFBDDCF0),
-                            iconTint = Color(0xFF2F7DB8),
+                            tileColor = blueTile.background,
+                            iconBg = blueTile.iconBg,
+                            iconTint = blueTile.iconTint,
                             amountColor = budgetAmountColor,
                             modifier = Modifier.weight(1f),
                         )
@@ -300,9 +338,10 @@ fun DashboardScreen(
                             label = "Planned",
                             amountPaise = totals.plannedBudgetPaise,
                             icon = Icons.Outlined.Flag,
-                            tileColor = Color(0xFFF3E8D4),
-                            iconBg = Color(0xFFE6D4B0),
-                            iconTint = Color(0xFFB07A2E),
+                            tileColor = sandTile.background,
+                            iconBg = sandTile.iconBg,
+                            iconTint = sandTile.iconTint,
+                            amountColor = sandTile.amount,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -315,18 +354,20 @@ fun DashboardScreen(
                             label = "Total spent",
                             amountPaise = totals.totalExpensesPaise,
                             icon = Icons.Outlined.CreditCard,
-                            tileColor = Color(0xFFF8E0D0),
-                            iconBg = Color(0xFFF0C8B4),
-                            iconTint = Color(0xFFD0653A),
+                            tileColor = peachTile.background,
+                            iconBg = peachTile.iconBg,
+                            iconTint = peachTile.iconTint,
+                            amountColor = peachTile.amount,
                             modifier = Modifier.weight(1f),
                         )
                         PremiumMetricTile(
                             label = "Outstanding",
                             amountPaise = totals.outstandingContributionsPaise,
                             icon = Icons.Outlined.PendingActions,
-                            tileColor = Color(0xFFF6E4DC),
-                            iconBg = Color(0xFFEED0C4),
-                            iconTint = Color(0xFFC47A5A),
+                            tileColor = warmTile.background,
+                            iconBg = warmTile.iconBg,
+                            iconTint = warmTile.iconTint,
+                            amountColor = warmTile.amount,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -391,7 +432,7 @@ fun DashboardScreen(
                                     .padding(bottom = 10.dp)
                                     .shadow(3.dp, RoundedCornerShape(18.dp), clip = false)
                                     .clip(RoundedCornerShape(18.dp))
-                                    .background(Color(0xFFF7FAFA))
+                                    .background(CoastalTokens.softFill)
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -420,8 +461,27 @@ fun DashboardScreen(
                     }
                 }
                 }
-                // Room to scroll past the floating nav capsule.
-                Spacer(Modifier.height(100.dp))
+            }
+
+            // Clears the floating nav.
+            Spacer(Modifier.height(floatingNavContentPadding()))
+            }
+
+            // Fixed on the hero (does not scroll with tiles); tappable while visible.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(heroHeight)
+                    .zIndex(if (budgetChipOnTop) 2f else 0f),
+            ) {
+                PlannedBudgetEditChip(
+                    plannedBudgetPaise = totals.plannedBudgetPaise,
+                    onEditBudget = onEditTrip,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 14.dp, bottom = 36.dp),
+                )
             }
         }
     }
@@ -472,9 +532,13 @@ private fun TripScenicHeader(
     dateRange: String?,
     plannedBudgetPaise: Long,
     onEditBudget: () -> Unit,
+    modifier: Modifier = Modifier,
+    showBudgetChip: Boolean = true,
+    imageZoom: Float = 1f,
+    imageOffsetY: Float = 0f,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(210.dp)
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
@@ -483,7 +547,13 @@ private fun TripScenicHeader(
             painter = painterResource(R.drawable.bg_trip_header),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.matchParentSize(),
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    scaleX = imageZoom
+                    scaleY = imageZoom
+                    translationY = imageOffsetY
+                },
         )
         Box(
             modifier = Modifier
@@ -548,37 +618,52 @@ private fun TripScenicHeader(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 14.dp, bottom = 36.dp)
-                .shadow(4.dp, RoundedCornerShape(14.dp), clip = false)
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color.White)
-                .clickable(onClick = onEditBudget)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Column {
-                Text(
-                    "Planned Budget",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFF5A6F6A),
-                )
-                Text(
-                    Money.formatInr(plannedBudgetPaise),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1A2B28),
-                )
-            }
-            Icon(
-                Icons.Outlined.Edit,
-                contentDescription = "Edit trip",
-                tint = Color(0xFF8A9E99),
-                modifier = Modifier.size(16.dp),
+        if (showBudgetChip) {
+            PlannedBudgetEditChip(
+                plannedBudgetPaise = plannedBudgetPaise,
+                onEditBudget = onEditBudget,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 14.dp, bottom = 36.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun PlannedBudgetEditChip(
+    plannedBudgetPaise: Long,
+    onEditBudget: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .shadow(4.dp, RoundedCornerShape(14.dp), clip = false)
+            .clip(RoundedCornerShape(14.dp))
+            .background(CoastalTokens.card)
+            .clickable(onClick = onEditBudget)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column {
+            Text(
+                "Planned Budget",
+                style = MaterialTheme.typography.labelMedium,
+                color = CoastalTokens.muted,
+            )
+            Text(
+                Money.formatInr(plannedBudgetPaise),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = CoastalTokens.ink,
+            )
+        }
+        Icon(
+            Icons.Outlined.Edit,
+            contentDescription = "Edit trip",
+            tint = CoastalTokens.muted,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }

@@ -53,9 +53,9 @@ import com.tripbudget.app.ui.components.EmptyState
 import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.components.LoadingContent
 import com.tripbudget.app.ui.components.SoftScreenCanvas
-import com.tripbudget.app.ui.theme.Teal100
+import com.tripbudget.app.ui.theme.CoastalTokens
 import com.tripbudget.app.ui.theme.Teal600
-import com.tripbudget.app.ui.theme.Teal700
+import com.tripbudget.app.ui.theme.floatingNavContentPadding
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -120,6 +120,7 @@ fun ExpensesScreen(
                 containerColor = Teal600,
                 contentColor = Color.White,
                 shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.padding(bottom = floatingNavContentPadding()),
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add expense")
             }
@@ -136,12 +137,18 @@ fun ExpensesScreen(
                 message = "Record food, fuel, stays, and other trip costs.",
                 actionLabel = "Add expense",
                 onAction = { showAdd = true },
+                modifier = Modifier.fillMaxSize(),
             )
         } else {
             SoftScreenCanvas {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 16.dp,
+                        bottom = floatingNavContentPadding(),
+                    ),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     item {
@@ -157,15 +164,15 @@ fun ExpensesScreen(
                             onValueChange = { query = it },
                             placeholder = { Text("Search expenses") },
                             leadingIcon = {
-                                Icon(Icons.Outlined.Search, contentDescription = null, tint = Teal700)
+                                Icon(Icons.Outlined.Search, contentDescription = null, tint = CoastalTokens.tealSoftFg)
                             },
                             singleLine = true,
                             shape = RoundedCornerShape(16.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
+                                focusedContainerColor = CoastalTokens.card,
+                                unfocusedContainerColor = CoastalTokens.card,
                                 focusedBorderColor = Teal600,
-                                unfocusedBorderColor = Color(0xFFD5E5E1),
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                             ),
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -190,9 +197,9 @@ fun ExpensesScreen(
                                     },
                                     shape = RoundedCornerShape(999.dp),
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Teal100,
-                                        selectedLabelColor = Teal700,
-                                        containerColor = Color.White,
+                                        selectedContainerColor = CoastalTokens.tealSoft,
+                                        selectedLabelColor = CoastalTokens.tealSoftFg,
+                                        containerColor = CoastalTokens.card,
                                     ),
                                 )
                             }
@@ -222,7 +229,7 @@ fun ExpensesScreen(
                                     Text(
                                         LocalDate.ofEpochDay(epochDay).format(dateFmt),
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = Teal700,
+                                        color = CoastalTokens.tealSoftFg,
                                     )
                                     Text(
                                         Money.formatInr(dayTotal),
@@ -245,7 +252,6 @@ fun ExpensesScreen(
                             }
                         }
                     }
-                    item { Spacer(Modifier.height(100.dp)) }
                 }
             }
         }
@@ -324,7 +330,7 @@ private fun ExpenseShowcaseRow(
             .fillMaxWidth()
             .shadow(2.dp, RoundedCornerShape(18.dp), clip = false)
             .clip(RoundedCornerShape(18.dp))
-            .background(Color.White)
+            .background(CoastalTokens.card)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -347,7 +353,7 @@ private fun ExpenseShowcaseRow(
             Text(
                 "−${Money.formatInr(expense.amountPaise)}",
                 style = MaterialTheme.typography.titleLarge,
-                color = Color(0xFF1A2B28),
+                color = CoastalTokens.ink,
             )
             Row {
                 IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {

@@ -122,7 +122,7 @@ fun PremiumMetricTile(
     iconBg: Color,
     iconTint: Color,
     modifier: Modifier = Modifier,
-    amountColor: Color = Color(0xFF1A2B28),
+    amountColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Row(
         modifier = modifier

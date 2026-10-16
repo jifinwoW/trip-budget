@@ -95,6 +95,7 @@ import com.tripbudget.app.ui.screens.settings.SettingsViewModel
 import com.tripbudget.app.ui.screens.trips.JoinTripDialog
 import com.tripbudget.app.ui.screens.trips.ShareTripDialog
 import com.tripbudget.app.ui.screens.trips.TripEditorDialog
+import com.tripbudget.app.ui.theme.CoastalTokens
 import com.tripbudget.app.ui.theme.LoraFontFamily
 import kotlinx.coroutines.flow.map
 import kotlin.math.abs
@@ -500,26 +501,27 @@ private fun CoastalAppHeader(
     onDeleteTrip: () -> Unit,
     canDeleteTrip: Boolean,
 ) {
+    val headerColors = if (CoastalTokens.isDark) {
+        listOf(Color(0xFF12201E), Color(0xFF0E1A18), Color(0xFF0C1816))
+    } else {
+        listOf(Color(0xFFD4EBF5), Color(0xFFE8F4FA), Color(0xFFF5FBFC))
+    }
+    val ownedPillBg = if (CoastalTokens.isDark) Color(0xFF1A3D38) else Color(0xFFE8F6F5)
+    val joinedPillBorder = MaterialTheme.colorScheme.outlineVariant
+    val accent = CoastalTokens.accent
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFFD4EBF5),
-                        Color(0xFFE8F4FA),
-                        Color(0xFFF5FBFC),
-                    ),
-                ),
-            ),
+            .background(Brush.verticalGradient(colors = headerColors)),
     ) {
-        // Soft white cloud patches mixed into the sky wash.
+        // Soft cloud patches mixed into the sky wash (dimmer in dark mode).
+        val cloudAlphaScale = if (CoastalTokens.isDark) 0.12f else 1f
         Canvas(modifier = Modifier.matchParentSize()) {
             fun cloud(cx: Float, cy: Float, radius: Float, alpha: Float) {
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = alpha),
+                            Color.White.copy(alpha = alpha * cloudAlphaScale),
                             Color.White.copy(alpha = 0f),
                         ),
                         center = Offset(cx, cy),
@@ -550,7 +552,7 @@ private fun CoastalAppHeader(
                 style = MaterialTheme.typography.headlineSmall,
                 fontFamily = LoraFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF0F2A26),
+                color = CoastalTokens.ink,
                 maxLines = 1,
             )
 
@@ -563,11 +565,11 @@ private fun CoastalAppHeader(
                         .clip(RoundedCornerShape(999.dp))
                         .border(
                             1.dp,
-                            if (state.selectedIsOwned) Color(0xFF0D8B8A) else Color(0xFFD7E4E1),
+                            if (state.selectedIsOwned) accent else joinedPillBorder,
                             RoundedCornerShape(999.dp),
                         )
                         .background(
-                            if (state.selectedIsOwned) Color(0xFFE8F6F5) else Color.White,
+                            if (state.selectedIsOwned) ownedPillBg else CoastalTokens.card,
                         )
                         .clickable { onTripMenuExpandedChange(true) }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -578,7 +580,7 @@ private fun CoastalAppHeader(
                         text = state.selectedTrip?.name ?: "Select trip",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF1A2B28),
+                        color = CoastalTokens.ink,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -587,13 +589,13 @@ private fun CoastalAppHeader(
                         text = if (state.selectedIsOwned) "Owner" else "Joined",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
-                        color = if (state.selectedIsOwned) Color(0xFF0D8B8A) else Color(0xFF8A9E99),
+                        color = if (state.selectedIsOwned) accent else CoastalTokens.muted,
                         maxLines = 1,
                     )
                     Icon(
                         Icons.Default.ExpandMore,
                         contentDescription = "Switch trip",
-                        tint = Color(0xFF0D8B8A),
+                        tint = accent,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -607,7 +609,7 @@ private fun CoastalAppHeader(
                                 Text(
                                     "Your trips",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = Color(0xFF0D8B8A),
+                                    color = accent,
                                     fontWeight = FontWeight.SemiBold,
                                 )
                             },
@@ -629,7 +631,7 @@ private fun CoastalAppHeader(
                                 Text(
                                     "Joined trips",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = Color(0xFF8A9E99),
+                                    color = CoastalTokens.muted,
                                     fontWeight = FontWeight.SemiBold,
                                 )
                             },
@@ -662,14 +664,14 @@ private fun CoastalAppHeader(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF0D8B8A))
+                    .background(accent)
                     .clickable(onClick = onCreateTrip),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Default.Add,
                     contentDescription = "New trip",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -682,7 +684,7 @@ private fun CoastalAppHeader(
                     Icon(
                         Icons.Default.MoreVert,
                         contentDescription = "More",
-                        tint = Color(0xFF5A6F6A),
+                        tint = CoastalTokens.muted,
                     )
                 }
                 DropdownMenu(
@@ -756,7 +758,7 @@ private fun TripMenuLabel(
             },
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = if (owned) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (owned) Color(0xFF0F2A26) else Color(0xFF1A2B28),
+            color = CoastalTokens.ink,
         )
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -766,13 +768,13 @@ private fun TripMenuLabel(
                 text = badge,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium,
-                color = if (owned) Color(0xFF0D8B8A) else Color(0xFF8A9E99),
+                color = if (owned) CoastalTokens.accent else CoastalTokens.muted,
             )
             TripDates.formatRange(trip)?.let { range ->
                 Text(
                     text = range,
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF8A9E99),
+                    color = CoastalTokens.muted,
                 )
             }
         }

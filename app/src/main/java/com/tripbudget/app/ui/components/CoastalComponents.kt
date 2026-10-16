@@ -38,9 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.tripbudget.app.domain.ExpenseCategory
 import com.tripbudget.app.domain.PaymentSource
 import com.tripbudget.app.ui.theme.CoastalTokens
-import com.tripbudget.app.ui.theme.SoftCanvas
-import com.tripbudget.app.ui.theme.Teal100
-import com.tripbudget.app.ui.theme.Teal700
+import com.tripbudget.app.ui.theme.Teal600
 
 data class CategoryVisual(
     val icon: ImageVector,
@@ -48,37 +46,41 @@ data class CategoryVisual(
     val background: Color,
 )
 
-fun categoryVisual(category: ExpenseCategory): CategoryVisual = when (category) {
-    ExpenseCategory.FOOD -> CategoryVisual(
-        Icons.Outlined.Restaurant,
-        Color(0xFFC45C2A),
-        Color(0xFFFFE4D4),
-    )
-    ExpenseCategory.FUEL -> CategoryVisual(
-        Icons.Outlined.LocalGasStation,
-        Color(0xFFB05A2E),
-        Color(0xFFF8E0D0),
-    )
-    ExpenseCategory.TRANSPORT -> CategoryVisual(
-        Icons.Outlined.DirectionsBus,
-        Color(0xFF2A6FA8),
-        Color(0xFFD7EAF7),
-    )
-    ExpenseCategory.ACCOMMODATION -> CategoryVisual(
-        Icons.Outlined.Hotel,
-        Color(0xFF5B4FA8),
-        Color(0xFFE8E4F8),
-    )
-    ExpenseCategory.ACTIVITIES -> CategoryVisual(
-        Icons.Outlined.Explore,
-        Color(0xFF0B7A6E),
-        Color(0xFFD5F3EE),
-    )
-    ExpenseCategory.OTHER -> CategoryVisual(
-        Icons.Outlined.MoreHoriz,
-        Color(0xFF5A6F6A),
-        Color(0xFFE8EEF0),
-    )
+@Composable
+fun categoryVisual(category: ExpenseCategory): CategoryVisual {
+    val dark = CoastalTokens.isDark
+    return when (category) {
+        ExpenseCategory.FOOD -> CategoryVisual(
+            Icons.Outlined.Restaurant,
+            if (dark) Color(0xFFFFA070) else Color(0xFFC45C2A),
+            if (dark) Color(0xFF4A2E22) else Color(0xFFFFE4D4),
+        )
+        ExpenseCategory.FUEL -> CategoryVisual(
+            Icons.Outlined.LocalGasStation,
+            if (dark) Color(0xFFE0A070) else Color(0xFFB05A2E),
+            if (dark) Color(0xFF3D2A1F) else Color(0xFFF8E0D0),
+        )
+        ExpenseCategory.TRANSPORT -> CategoryVisual(
+            Icons.Outlined.DirectionsBus,
+            if (dark) Color(0xFF7EB8E0) else Color(0xFF2A6FA8),
+            if (dark) Color(0xFF1E3040) else Color(0xFFD7EAF7),
+        )
+        ExpenseCategory.ACCOMMODATION -> CategoryVisual(
+            Icons.Outlined.Hotel,
+            if (dark) Color(0xFFB0A0E8) else Color(0xFF5B4FA8),
+            if (dark) Color(0xFF2A2848) else Color(0xFFE8E4F8),
+        )
+        ExpenseCategory.ACTIVITIES -> CategoryVisual(
+            Icons.Outlined.Explore,
+            if (dark) Color(0xFF5ED4C2) else Color(0xFF0B7A6E),
+            if (dark) Color(0xFF1A3D38) else Color(0xFFD5F3EE),
+        )
+        ExpenseCategory.OTHER -> CategoryVisual(
+            Icons.Outlined.MoreHoriz,
+            if (dark) Color(0xFFB0C8C2) else Color(0xFF5A6F6A),
+            if (dark) Color(0xFF2A3835) else Color(0xFFE8EEF0),
+        )
+    }
 }
 
 @Composable
@@ -86,15 +88,18 @@ fun SoftScreenCanvas(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val canvas = CoastalTokens.canvas
+    val orbAlpha = if (CoastalTokens.isDark) 0.10f else 0.22f
+    val warmAlpha = if (CoastalTokens.isDark) 0.08f else 0.18f
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(SoftCanvas),
+            .background(canvas),
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF7ED9C8).copy(alpha = 0.22f), Color.Transparent),
+                    colors = listOf(Color(0xFF7ED9C8).copy(alpha = orbAlpha), Color.Transparent),
                     center = Offset(size.width * 0.1f, size.height * 0.05f),
                     radius = size.minDimension * 0.5f,
                 ),
@@ -103,7 +108,7 @@ fun SoftScreenCanvas(
             )
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFFFD2B8).copy(alpha = 0.18f), Color.Transparent),
+                    colors = listOf(Color(0xFFFFD2B8).copy(alpha = warmAlpha), Color.Transparent),
                     center = Offset(size.width * 0.95f, size.height * 0.2f),
                     radius = size.minDimension * 0.45f,
                 ),
@@ -165,12 +170,12 @@ fun ExpenseSourceChip(
         PaymentSource.PERSONAL -> if (payerName != null) "Personal · $payerName" else "Personal"
     }
     val bg = when (source) {
-        PaymentSource.SHARED -> Teal100
-        PaymentSource.PERSONAL -> CoastalTokens.sand
+        PaymentSource.SHARED -> CoastalTokens.tealSoft
+        PaymentSource.PERSONAL -> CoastalTokens.sandSoft
     }
     val fg = when (source) {
-        PaymentSource.SHARED -> Teal700
-        PaymentSource.PERSONAL -> Color(0xFF8A5A2B)
+        PaymentSource.SHARED -> CoastalTokens.tealSoftFg
+        PaymentSource.PERSONAL -> if (CoastalTokens.isDark) Color(0xFFE0B86A) else Color(0xFF8A5A2B)
     }
     SoftCategoryChip(
         text = label,
@@ -190,13 +195,13 @@ fun MemberAvatar(
         modifier = modifier
             .size(44.dp)
             .clip(CircleShape)
-            .background(Teal100),
+            .background(CoastalTokens.tealSoft),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = initial,
             style = MaterialTheme.typography.titleLarge,
-            color = Teal700,
+            color = CoastalTokens.tealSoftFg,
             fontWeight = FontWeight.SemiBold,
         )
     }
@@ -223,10 +228,14 @@ fun MemberStatusBadge(
     modifier: Modifier = Modifier,
 ) {
     val (label, bg, fg) = when (status) {
-        MemberPayStatus.SETTLED -> Triple("Settled", CoastalTokens.settledBg, CoastalTokens.settled)
-        MemberPayStatus.OUTSTANDING -> Triple("Outstanding", CoastalTokens.peach, Color(0xFFB05A2E))
-        MemberPayStatus.EXCESS -> Triple("Excess", Teal100, Teal700)
-        MemberPayStatus.NONE -> Triple("No payments", Color(0xFFE8EEF0), Color(0xFF5A6F6A))
+        MemberPayStatus.SETTLED -> Triple("Settled", CoastalTokens.settledSoft, CoastalTokens.settledFg)
+        MemberPayStatus.OUTSTANDING -> Triple(
+            "Outstanding",
+            CoastalTokens.peachSoft,
+            if (CoastalTokens.isDark) Color(0xFFFFA070) else Color(0xFFB05A2E),
+        )
+        MemberPayStatus.EXCESS -> Triple("Excess", CoastalTokens.tealSoft, CoastalTokens.tealSoftFg)
+        MemberPayStatus.NONE -> Triple("No payments", CoastalTokens.chipNeutral, CoastalTokens.muted)
     }
     Text(
         text = label,
@@ -272,7 +281,8 @@ fun PrimaryCoastalButton(
         enabled = enabled,
         shape = RoundedCornerShape(18.dp),
         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-            containerColor = CoastalTokens.positive,
+            containerColor = Teal600,
+            contentColor = Color.White,
         ),
         modifier = modifier,
     ) {

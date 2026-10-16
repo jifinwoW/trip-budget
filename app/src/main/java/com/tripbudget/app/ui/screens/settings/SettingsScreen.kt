@@ -23,7 +23,7 @@ import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialTheme 
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
@@ -49,10 +49,10 @@ import com.tripbudget.app.data.ThemeMode
 import com.tripbudget.app.ui.components.EnterCascade
 import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.components.SoftScreenCanvas
+import com.tripbudget.app.ui.theme.CoastalTokens
 import com.tripbudget.app.ui.theme.LoraFontFamily
-import com.tripbudget.app.ui.theme.Teal100
 import com.tripbudget.app.ui.theme.Teal600
-import com.tripbudget.app.ui.theme.Teal700
+import com.tripbudget.app.ui.theme.floatingNavContentPadding
 
 @Composable
 fun SettingsScreen(
@@ -94,7 +94,7 @@ fun SettingsScreen(
                     Text(
                         "Account",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF5A6F6A),
+                        color = CoastalTokens.muted,
                     )
                     Spacer(Modifier.height(8.dp))
                     Column(
@@ -102,7 +102,7 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color.White)
+                            .background(CoastalTokens.card)
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
@@ -110,10 +110,10 @@ fun SettingsScreen(
                             cloud.user?.email?.takeIf { it.isNotBlank() }
                                 ?: "Joined as guest",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF1A2B28),
+                            color = CoastalTokens.ink,
                         )
                         cloud.message?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = Teal700)
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = CoastalTokens.accent)
                         }
                         TextButton(
                             onClick = viewModel::signOut,
@@ -131,7 +131,7 @@ fun SettingsScreen(
                 Text(
                     "Appearance",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color(0xFF5A6F6A),
+                    color = CoastalTokens.muted,
                 )
                 Spacer(Modifier.height(8.dp))
                 Column(
@@ -139,7 +139,7 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White)
+                        .background(CoastalTokens.card)
                         .selectableGroup()
                         .padding(vertical = 2.dp),
                 ) {
@@ -204,8 +204,8 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-            // Room to scroll past the floating nav capsule.
-            Spacer(Modifier.height(100.dp))
+            // Room so the last cards clear the floating nav capsule.
+            Spacer(Modifier.height(floatingNavContentPadding()))
         }
     }
     }
@@ -220,7 +220,7 @@ private fun AboutSection(
             .fillMaxWidth()
             .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
             .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
+            .background(CoastalTokens.card)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -232,13 +232,13 @@ private fun AboutSection(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Teal100),
+                    .background(CoastalTokens.tealSoft),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Outlined.AccountBalanceWallet,
                     contentDescription = null,
-                    tint = Teal700,
+                    tint = CoastalTokens.tealSoftFg,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -246,14 +246,14 @@ private fun AboutSection(
                 Text(
                     "About",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFF8A9E99),
+                    color = CoastalTokens.muted,
                 )
                 Text(
                     stringResource(R.string.brand_name),
                     style = MaterialTheme.typography.headlineMedium,
                     fontFamily = LoraFontFamily,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF0F2A26),
+                    color = CoastalTokens.ink,
                 )
             }
             Text(
@@ -262,7 +262,7 @@ private fun AboutSection(
                 color = Teal600,
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFEAF5F4))
+                    .background(CoastalTokens.softFillAlt)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
@@ -270,7 +270,7 @@ private fun AboutSection(
         Text(
             text = "Everything stays live in the cloud. Swipe down any page to refresh.",
             style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF5A6F6A),
+            color = CoastalTokens.muted,
         )
 
         Row(
@@ -305,7 +305,7 @@ private fun AboutChip(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFF3F8F7))
+            .background(CoastalTokens.softFill)
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -314,7 +314,7 @@ private fun AboutChip(
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFF1A2B28),
+            color = CoastalTokens.ink,
             maxLines = 1,
         )
     }

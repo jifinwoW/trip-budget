@@ -47,7 +47,6 @@ import com.tripbudget.app.data.entity.ContributionEntity
 import com.tripbudget.app.data.entity.MemberEntity
 import com.tripbudget.app.domain.MemberBalance
 import com.tripbudget.app.domain.Money
-import com.tripbudget.app.ui.components.CoastalProgressTeal
 import com.tripbudget.app.ui.components.CoastalProgressTrack
 import com.tripbudget.app.ui.components.ConfirmDialog
 import com.tripbudget.app.ui.components.EmptyState
@@ -60,7 +59,7 @@ import com.tripbudget.app.ui.components.SoftScreenCanvas
 import com.tripbudget.app.ui.components.memberPayStatus
 import com.tripbudget.app.ui.theme.CoastalTokens
 import com.tripbudget.app.ui.theme.Teal600
-import com.tripbudget.app.ui.theme.Teal700
+import com.tripbudget.app.ui.theme.floatingNavContentPadding
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -103,6 +102,7 @@ fun MembersScreen(
                 containerColor = Teal600,
                 contentColor = Color.White,
                 shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.padding(bottom = floatingNavContentPadding()),
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add member")
             }
@@ -119,12 +119,18 @@ fun MembersScreen(
                 message = "Add people and set how much each should contribute.",
                 actionLabel = "Add member",
                 onAction = { showAddMember = true },
+                modifier = Modifier.fillMaxSize(),
             )
         } else {
             SoftScreenCanvas {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 14.dp,
+                        bottom = floatingNavContentPadding(),
+                    ),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     item {
@@ -138,30 +144,29 @@ fun MembersScreen(
                                 .fillMaxWidth()
                                 .shadow(2.dp, RoundedCornerShape(18.dp), clip = false)
                                 .clip(RoundedCornerShape(18.dp))
-                                .background(Color.White)
+                                .background(CoastalTokens.card)
                                 .padding(horizontal = 16.dp, vertical = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
                                 "Contributions collected",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Color(0xFF8A9E99),
+                                color = CoastalTokens.muted,
                             )
                             Text(
                                 Money.formatInr(collectedTotal),
                                 style = MaterialTheme.typography.headlineMedium,
-                                color = Teal700,
+                                color = CoastalTokens.tealSoftFg,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
                                 "of ${Money.formatInr(expectedTotal)} expected · ${(collectedProgress * 100f).toInt().coerceAtLeast(0)}%",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF5A6F6A),
+                                color = CoastalTokens.muted,
                             )
                             Spacer(Modifier.height(4.dp))
                             CoastalProgressTrack(
                                 progress = collectedProgress,
-                                fillColor = CoastalProgressTeal,
                             )
                         }
                     }
@@ -182,7 +187,6 @@ fun MembersScreen(
                             onDeleteContribution = { deletingContribution = it },
                         )
                     }
-                    item { Spacer(Modifier.height(100.dp)) }
                 }
             }
         }
@@ -277,9 +281,9 @@ private fun MemberCard(
         "Outstanding ${Money.formatInr(balance.outstandingPaise)}"
     }
     val balanceColor = when {
-        balance.hasExcess -> CoastalTokens.positive
-        balance.outstandingPaise > 0 -> CoastalTokens.negative
-        else -> Color(0xFF1A2B28)
+        balance.hasExcess -> CoastalTokens.accent
+        balance.outstandingPaise > 0 -> CoastalTokens.danger
+        else -> CoastalTokens.ink
     }
 
     Column(
@@ -287,7 +291,7 @@ private fun MemberCard(
             .fillMaxWidth()
             .shadow(2.dp, RoundedCornerShape(18.dp), clip = false)
             .clip(RoundedCornerShape(18.dp))
-            .background(Color.White)
+            .background(CoastalTokens.card)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -306,7 +310,7 @@ private fun MemberCard(
                         balance.name,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF0F2A26),
+                        color = CoastalTokens.ink,
                     )
                     MemberStatusBadge(status)
                 }
@@ -314,13 +318,13 @@ private fun MemberCard(
                 Text(
                     text = "Expected ${Money.formatInr(balance.expectedPaise)}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF5A6F6A),
+                    color = CoastalTokens.muted,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = "Paid ${Money.formatInr(balance.paidPaise)}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF5A6F6A),
+                    color = CoastalTokens.muted,
                 )
             }
         }
@@ -334,7 +338,7 @@ private fun MemberCard(
 
         CoastalProgressTrack(
             progress = memberProgress,
-            fillColor = CoastalProgressTeal,
+            fillColor = CoastalTokens.progressFill,
             height = 7.dp,
         )
 
@@ -369,7 +373,7 @@ private fun MemberCard(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .clickable(onClick = onToggleHistory)
-                .background(Color(0xFFF3F8F7))
+                .background(CoastalTokens.softFill)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -377,12 +381,12 @@ private fun MemberCard(
             Text(
                 text = if (historyExpanded) "Hide payment history" else "Payment history",
                 style = MaterialTheme.typography.labelLarge,
-                color = Teal700,
+                color = CoastalTokens.tealSoftFg,
             )
             Icon(
                 imageVector = if (historyExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                 contentDescription = null,
-                tint = Teal600,
+                tint = CoastalTokens.accent,
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -392,7 +396,7 @@ private fun MemberCard(
                 Text(
                     "No payments recorded.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF8A9E99),
+                    color = CoastalTokens.muted,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             } else {
@@ -421,13 +425,13 @@ private fun MemberActionChip(
 ) {
     val bg = when {
         filled -> Teal600
-        danger -> Color(0xFFFCE8E4)
-        else -> Color(0xFFF3F8F7)
+        danger -> CoastalTokens.dangerSoft
+        else -> CoastalTokens.softFill
     }
     val fg = when {
         filled -> Color.White
-        danger -> CoastalTokens.negative
-        else -> Color(0xFF1A2B28)
+        danger -> CoastalTokens.danger
+        else -> CoastalTokens.ink
     }
     Row(
         modifier = modifier
@@ -435,7 +439,7 @@ private fun MemberActionChip(
             .background(bg)
             .then(
                 if (!filled && !danger) {
-                    Modifier.border(1.dp, Color(0xFFD5E4E1), RoundedCornerShape(12.dp))
+                    Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                 } else {
                     Modifier
                 },
@@ -465,7 +469,7 @@ private fun ContributionHistoryRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFEAF5F4))
+            .background(CoastalTokens.softFillAlt)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -478,10 +482,10 @@ private fun ContributionHistoryRow(
             Text(
                 text = formatter.format(Instant.ofEpochMilli(contribution.paidAt)),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF5A6F6A),
+                color = CoastalTokens.muted,
             )
             contribution.note?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF5A6F6A))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = CoastalTokens.muted)
             }
         }
         TextButton(onClick = onEdit) { Text("Edit") }
