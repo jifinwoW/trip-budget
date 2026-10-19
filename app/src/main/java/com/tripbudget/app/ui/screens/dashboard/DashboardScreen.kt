@@ -18,19 +18,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PendingActions
-import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.TrendingDown
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -69,6 +67,7 @@ import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.components.DashboardShimmer
 import com.tripbudget.app.ui.components.PremiumMetricTile
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
+import com.tripbudget.app.ui.components.RoadMapRouteChip
 import com.tripbudget.app.ui.components.SecondaryCoastalButton
 import com.tripbudget.app.ui.components.SharedCashHeroCard
 import com.tripbudget.app.ui.components.SoftCategoryChip
@@ -487,18 +486,15 @@ fun DashboardScreen(
                 )
             }
 
-            FloatingActionButton(
+            RoadMapRouteChip(
+                stopCount = state.routeStopCount,
+                nextStopTitle = state.nextStopTitle,
                 onClick = onOpenRoutePlan,
-                containerColor = Teal600,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(18.dp),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 16.dp, bottom = floatingNavContentPadding() + 12.dp)
                     .zIndex(3f),
-            ) {
-                Icon(Icons.Default.Map, contentDescription = "Route plan")
-            }
+            )
         }
     }
 

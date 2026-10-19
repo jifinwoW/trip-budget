@@ -7,6 +7,7 @@ import com.tripbudget.app.cloud.AuthRepository
 import com.tripbudget.app.cloud.AuthUser
 import com.tripbudget.app.cloud.SyncEngine
 import com.tripbudget.app.data.SyncPreferences
+import com.tripbudget.app.data.HeaderWeatherPreference
 import com.tripbudget.app.data.ThemeMode
 import com.tripbudget.app.data.ThemePreferences
 import com.tripbudget.app.data.TripRepository
@@ -37,6 +38,13 @@ class SettingsViewModel(
     val themeMode: StateFlow<ThemeMode> = themePreferences.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.SYSTEM)
 
+    val headerWeather: StateFlow<HeaderWeatherPreference> = themePreferences.headerWeather
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            HeaderWeatherPreference.LIVE,
+        )
+
     private val _cloud = MutableStateFlow(
         CloudUiState(configured = authRepository.isConfigured),
     )
@@ -53,6 +61,12 @@ class SettingsViewModel(
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             themePreferences.setThemeMode(mode)
+        }
+    }
+
+    fun setHeaderWeather(preference: HeaderWeatherPreference) {
+        viewModelScope.launch {
+            themePreferences.setHeaderWeather(preference)
         }
     }
 

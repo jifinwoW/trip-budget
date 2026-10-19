@@ -17,17 +17,22 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,9 +47,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tripbudget.app.R
+import com.tripbudget.app.data.HeaderWeatherPreference
 import com.tripbudget.app.data.ThemeMode
 import com.tripbudget.app.ui.components.EnterCascade
 import com.tripbudget.app.ui.components.LivePullRefresh
@@ -61,6 +68,7 @@ fun SettingsScreen(
     onRefresh: () -> Unit = {},
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val headerWeather by viewModel.headerWeather.collectAsStateWithLifecycle()
     val cloud by viewModel.cloud.collectAsStateWithLifecycle()
 
     LivePullRefresh(
@@ -97,32 +105,12 @@ fun SettingsScreen(
                         color = CoastalTokens.muted,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(CoastalTokens.card)
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            cloud.user?.email?.takeIf { it.isNotBlank() }
-                                ?: "Joined as guest",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = CoastalTokens.ink,
-                        )
-                        cloud.message?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = CoastalTokens.accent)
-                        }
-                        TextButton(
-                            onClick = viewModel::signOut,
-                            enabled = !cloud.busy,
-                            modifier = Modifier.align(Alignment.CenterHorizontally),
-                        ) {
-                            Text("Sign out")
-                        }
-                    }
+                    AccountCard(
+                        email = cloud.user?.email,
+                        message = cloud.message,
+                        busy = cloud.busy,
+                        onSignOut = viewModel::signOut,
+                    )
                 }
                 Spacer(Modifier.height(14.dp))
             }
@@ -152,6 +140,34 @@ fun SettingsScreen(
                             },
                             selected = themeMode == mode,
                             onClick = { viewModel.setThemeMode(mode) },
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            EnterCascade(100) {
+                Text(
+                    "Header weather",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = CoastalTokens.muted,
+                )
+                Spacer(Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(CoastalTokens.card)
+                        .selectableGroup()
+                        .padding(vertical = 2.dp),
+                ) {
+                    HeaderWeatherPreference.entries.forEach { preference ->
+                        RowOption(
+                            label = preference.label(),
+                            selected = headerWeather == preference,
+                            onClick = { viewModel.setHeaderWeather(preference) },
                         )
                     }
                 }
@@ -208,6 +224,151 @@ fun SettingsScreen(
             Spacer(Modifier.height(floatingNavContentPadding()))
         }
     }
+    }
+}
+
+@Composable
+private fun AccountCard(
+    email: String?,
+    message: String?,
+    busy: Boolean,
+    onSignOut: () -> Unit,
+) {
+    val hasEmail = !email.isNullOrBlank()
+    val displayName = if (hasEmail) email!!.substringBefore("@") else "Guest"
+    val initial = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp, RoundedCornerShape(14.dp), clip = false)
+            .clip(RoundedCornerShape(14.dp))
+            .background(CoastalTokens.card)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(CoastalTokens.tealSoft, CoastalTokens.softFillAlt),
+                        ),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (hasEmail) {
+                    Text(
+                        initial,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontFamily = LoraFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = CoastalTokens.tealSoftFg,
+                    )
+                } else {
+                    Icon(
+                        Icons.Outlined.Person,
+                        contentDescription = null,
+                        tint = CoastalTokens.tealSoftFg,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    if (hasEmail) displayName.replaceFirstChar { it.titlecase() } else "Guest traveler",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CoastalTokens.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        if (hasEmail) Icons.Outlined.MailOutline else Icons.Outlined.Lock,
+                        contentDescription = null,
+                        tint = CoastalTokens.muted,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Text(
+                        if (hasEmail) email!! else "Joined without an email",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CoastalTokens.muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Text(
+                if (hasEmail) "Signed in" else "Guest",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (hasEmail) CoastalTokens.settledFg else CoastalTokens.muted,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(
+                        if (hasEmail) CoastalTokens.settledSoft else CoastalTokens.softFill,
+                    )
+                    .padding(horizontal = 9.dp, vertical = 5.dp),
+            )
+        }
+
+        message?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = CoastalTokens.accent,
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .border(1.dp, CoastalTokens.danger.copy(alpha = 0.28f), RoundedCornerShape(14.dp))
+                .background(CoastalTokens.dangerSoft)
+                .clickable(enabled = !busy, onClick = onSignOut)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            if (busy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = CoastalTokens.danger,
+                )
+                Spacer(Modifier.size(10.dp))
+                Text(
+                    "Signing out…",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CoastalTokens.danger,
+                )
+            } else {
+                Icon(
+                    Icons.AutoMirrored.Outlined.Logout,
+                    contentDescription = null,
+                    tint = CoastalTokens.danger,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    "Sign out",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CoastalTokens.danger,
+                )
+            }
+        }
     }
 }
 

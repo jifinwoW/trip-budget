@@ -11,6 +11,7 @@ import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.ExpenseCategory
 import com.tripbudget.app.domain.Money
 import com.tripbudget.app.domain.PaymentSource
+import com.tripbudget.app.domain.RouteStopStatus
 import com.tripbudget.app.domain.TripTotals
 import com.tripbudget.app.ui.tripScopedStateIn
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,8 @@ data class DashboardUiState(
     val totals: TripTotals? = null,
     val recentExpenses: List<ExpenseEntity> = emptyList(),
     val members: List<MemberEntity> = emptyList(),
+    val routeStopCount: Int = 0,
+    val nextStopTitle: String? = null,
 )
 
 class DashboardViewModel(
@@ -41,13 +44,20 @@ class DashboardViewModel(
             repository.observeTripTotals(tripId),
             repository.observeRecentExpenses(tripId),
             repository.observeMembers(tripId),
-        ) { trip, totals, recent, members ->
+            repository.observeRouteStops(tripId),
+        ) { trip, totals, recent, members, stops ->
+            val ordered = stops.sortedBy { it.sortOrder }
+            val next = ordered.firstOrNull {
+                it.status == RouteStopStatus.CURRENT || it.status == RouteStopStatus.UPCOMING
+            }
             DashboardUiState(
                 isLoading = false,
                 trip = trip,
                 totals = totals,
                 recentExpenses = recent,
                 members = members,
+                routeStopCount = ordered.size,
+                nextStopTitle = next?.title?.takeIf { it.isNotBlank() },
             )
         }
     }

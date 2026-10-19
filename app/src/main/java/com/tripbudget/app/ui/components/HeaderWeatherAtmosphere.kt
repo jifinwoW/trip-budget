@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -16,6 +17,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -24,6 +26,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.tripbudget.app.R
 import com.tripbudget.app.places.WeatherKind
 import kotlin.math.cos
 import kotlin.math.sin
@@ -118,43 +123,125 @@ fun HeaderWeatherAtmosphere(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val t = drift.value
-            val r = rainPhase.value
-            val flash = flashPhase.value
-            // Unbounded phase so sin/fall keep flowing; per-flake % wraps stagger.
-            val snowT = snowTimeSec / 3.6f
+        val sceneRes = when (kind) {
+            WeatherKind.SUNNY -> R.drawable.bg_header_sunny
+            WeatherKind.CLOUDY -> R.drawable.bg_header_cloudy
+            WeatherKind.FOG -> R.drawable.bg_header_fog
+            WeatherKind.RAIN -> R.drawable.bg_header_rain
+            WeatherKind.STORM -> R.drawable.bg_header_storm
+            WeatherKind.SNOW -> R.drawable.bg_header_snow
+            else -> null
+        }
+        if (sceneRes != null) {
+            // Wash fills clear top; scene art sits across the header.
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawRect(brush = Brush.verticalGradient(headerWash(kind, isDark)))
+            }
+            Image(
+                painter = painterResource(sceneRes),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                // Left-weighted cottage scenes — keep Start when cropping.
+                alignment = if (kind == WeatherKind.RAIN) {
+                    Alignment.BottomCenter
+                } else {
+                    Alignment.BottomStart
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = if (isDark) 0.06f else 0.14f),
+                            Color.Transparent,
+                            Color.Transparent,
+                        ),
+                    ),
+                )
+                when (kind) {
+                    WeatherKind.RAIN -> drawRain(
+                        size.width,
+                        size.height,
+                        rainPhase.value,
+                        rainDrops,
+                        isDark,
+                    )
+                    WeatherKind.STORM -> {
+                        drawRain(
+                            size.width,
+                            size.height,
+                            rainPhase.value,
+                            rainDrops,
+                            isDark,
+                            heavier = true,
+                        )
+                        drawLightning(
+                            size.width,
+                            size.height,
+                            flashPhase.value,
+                            lightningBolts,
+                            isDark,
+                        )
+                    }
+                    WeatherKind.SNOW -> drawSnow(
+                        size.width,
+                        size.height,
+                        snowTimeSec / 3.6f,
+                        snowFlakes,
+                        isDark,
+                    )
+                    else -> Unit // sunny / cloudy / fog: illustration only
+                }
+            }
+        } else {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                val t = drift.value
 
-            // Base sky wash — weather-keyed, soft enough for brand type on top
-            val wash = headerWash(kind, isDark)
-            drawRect(brush = Brush.verticalGradient(wash))
+                // Base sky wash — weather-keyed, soft enough for brand type on top
+                val wash = headerWash(kind, isDark)
+                drawRect(brush = Brush.verticalGradient(wash))
 
-            when (kind) {
-                WeatherKind.SUNNY -> drawSunny(w, h, t, isDark)
-                WeatherKind.CLOUDY -> drawCloudy(w, h, t, isDark)
-                WeatherKind.FOG -> drawFog(w, h, t, isDark)
-                WeatherKind.RAIN -> {
-                    drawRainSky(w, h, isDark)
-                    drawRain(w, h, r, rainDrops, isDark)
-                }
-                WeatherKind.STORM -> {
-                    drawStormSky(w, h, isDark)
-                    drawRain(w, h, r, rainDrops, isDark, heavier = true)
-                    drawLightning(w, h, flash, lightningBolts, isDark)
-                }
-                WeatherKind.SNOW -> {
-                    drawSnowSky(w, h, snowT, isDark)
-                    drawSnow(w, h, snowT, snowFlakes, isDark)
-                }
-                WeatherKind.UNKNOWN, null -> {
-                    // Soft default coastal mist only
-                    drawDefaultMist(w, h, t, isDark)
+                when (kind) {
+                    WeatherKind.SUNNY, WeatherKind.CLOUDY, WeatherKind.FOG,
+                    WeatherKind.RAIN, WeatherKind.STORM, WeatherKind.SNOW -> Unit
+                    WeatherKind.UNKNOWN, null -> {
+                        // Soft default coastal mist only
+                        drawDefaultMist(w, h, t, isDark)
+                    }
                 }
             }
         }
     }
+}
+
+/**
+ * Brand / header title color that stays readable on the weather wash.
+ * Uses relative luminance of the top sky stop (and rain art left-side tones).
+ */
+fun headerBrandInk(kind: WeatherKind?, isDark: Boolean): Color {
+    val top = headerWashColors(kind, isDark).first()
+    return if (relativeLuminance(top) < 0.48f) {
+        Color(0xFFF5FBFA)
+    } else {
+        Color(0xFF12201E)
+    }
+}
+
+private fun relativeLuminance(color: Color): Float {
+    fun channel(c: Float): Float {
+        val v = c.coerceIn(0f, 1f)
+        return if (v <= 0.03928f) v / 12.92f else ((v + 0.055f) / 1.055f)
+            .toDouble()
+            .let { Math.pow(it, 2.4) }
+            .toFloat()
+    }
+    val r = channel(color.red)
+    val g = channel(color.green)
+    val b = channel(color.blue)
+    return 0.2126f * r + 0.7152f * g + 0.0722f * b
 }
 
 /** Gradient stops for the header background by weather. */
@@ -163,7 +250,8 @@ fun headerWashColors(kind: WeatherKind?, isDark: Boolean): List<Color> {
         return when (kind) {
             WeatherKind.SUNNY -> listOf(Color(0xFF1A2820), Color(0xFF12201E), Color(0xFF0E1A18))
             WeatherKind.CLOUDY -> listOf(Color(0xFF1A2228), Color(0xFF141C22), Color(0xFF0E161C))
-            WeatherKind.RAIN -> listOf(Color(0xFF162028), Color(0xFF101820), Color(0xFF0C141C))
+            // Match frog-rain banner (moss / mist)
+            WeatherKind.RAIN -> listOf(Color(0xFF1A2824), Color(0xFF14201E), Color(0xFF101818))
             WeatherKind.STORM -> listOf(Color(0xFF181428), Color(0xFF120E1E), Color(0xFF0C0A16))
             WeatherKind.SNOW -> listOf(Color(0xFF1A222A), Color(0xFF141C24), Color(0xFF101820))
             WeatherKind.FOG -> listOf(Color(0xFF1C2224), Color(0xFF161C1E), Color(0xFF121618))
@@ -173,7 +261,8 @@ fun headerWashColors(kind: WeatherKind?, isDark: Boolean): List<Color> {
     return when (kind) {
         WeatherKind.SUNNY -> listOf(Color(0xFFBFE8F2), Color(0xFFE8F6FA), Color(0xFFF8FCFD))
         WeatherKind.CLOUDY -> listOf(Color(0xFFC5D4DE), Color(0xFFDCE6EC), Color(0xFFEEF3F6))
-        WeatherKind.RAIN -> listOf(Color(0xFF8FA8B8), Color(0xFFB0C4D0), Color(0xFFD0DCE4))
+        // Soft grey-green to blend under the rain illustration
+        WeatherKind.RAIN -> listOf(Color(0xFF9BB0A8), Color(0xFFB8C8C0), Color(0xFFD0DCD4))
         WeatherKind.STORM -> listOf(Color(0xFF8FA0B4), Color(0xFFA8B4C4), Color(0xFFC8D0DC))
         // Cooler slate so white flakes read in light mode
         WeatherKind.SNOW -> listOf(Color(0xFF9AAEBE), Color(0xFFB8C8D4), Color(0xFFD2DCE4))

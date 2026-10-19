@@ -2,8 +2,10 @@ package com.tripbudget.app.ui.navigation
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,21 +30,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GroupAdd
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,8 +64,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -74,6 +82,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tripbudget.app.R
 import com.tripbudget.app.cloud.AuthRepository
 import com.tripbudget.app.cloud.SyncEngine
+import com.tripbudget.app.data.HeaderWeatherPreference
 import com.tripbudget.app.data.SyncPreferences
 import com.tripbudget.app.data.ThemePreferences
 import com.tripbudget.app.data.TripRepository
@@ -184,7 +193,6 @@ fun TripBudgetNavHost(
     var showSignIn by remember { mutableStateOf(false) }
     var showRoutePlan by remember { mutableStateOf(false) }
     var tripMenuExpanded by remember { mutableStateOf(false) }
-    var moreMenuExpanded by remember { mutableStateOf(false) }
 
     // Only react to settled auth. Never wipe local data here — that race destroyed
     // trips when the app resumed and session briefly looked empty.
@@ -201,7 +209,6 @@ fun TripBudgetNavHost(
             showJoinTrip = false
             showRoutePlan = false
             tripMenuExpanded = false
-            moreMenuExpanded = false
         } else {
             tripSelectionVm.startLiveSync()
         }
@@ -306,15 +313,21 @@ fun TripBudgetNavHost(
                 LoadingContent()
             } else {
             val context = LocalContext.current
+            val headerWeatherPref by themePreferences.headerWeather
+                .collectAsStateWithLifecycle(HeaderWeatherPreference.LIVE)
             var headerWeatherKind by remember { mutableStateOf<WeatherKind?>(null) }
-            LaunchedEffect(hasLocationPermission) {
-                headerWeatherKind = if (hasLocationPermission) {
-                    DeviceLocationWeather.fetch(context)?.kind
-                } else {
-                    null
+            LaunchedEffect(headerWeatherPref, hasLocationPermission) {
+                headerWeatherKind = when (headerWeatherPref) {
+                    HeaderWeatherPreference.LIVE -> {
+                        if (hasLocationPermission) {
+                            DeviceLocationWeather.fetch(context)?.kind
+                        } else {
+                            null
+                        }
+                    }
+                    else -> headerWeatherPref.toWeatherKind()
                 }
             }
-            val headerSky = headerWashColors(headerWeatherKind, CoastalTokens.isDark)
             val statusBarPad = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             // Extra under-hero strip only on Dashboard (rounded hero corners).
             val weatherUnderHero =
@@ -326,54 +339,66 @@ fun TripBudgetNavHost(
             )
             Box(modifier = Modifier.fillMaxSize()) {
             // Weather sky behind toolbar; extends under hero corners on Dashboard only.
+            // Crossfade so switching Header weather in Settings feels like the sky changing.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(weatherLayerHeight)
                     .align(Alignment.TopCenter)
-                    .zIndex(0f)
-                    .background(Brush.verticalGradient(headerSky)),
+                    .zIndex(0f),
             ) {
-                HeaderWeatherAtmosphere(
-                    kind = headerWeatherKind,
-                    isDark = CoastalTokens.isDark,
+                Crossfade(
+                    targetState = headerWeatherKind,
+                    animationSpec = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+                    label = "header_weather_kind",
                     modifier = Modifier.fillMaxSize(),
-                )
+                ) { kind ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    headerWashColors(kind, CoastalTokens.isDark),
+                                ),
+                            ),
+                    ) {
+                        HeaderWeatherAtmosphere(
+                            kind = kind,
+                            isDark = CoastalTokens.isDark,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
             }
             Scaffold(
                 containerColor = Color.Transparent,
                 topBar = {
                     CoastalAppHeader(
                         state = tripState,
-                        weatherKind = headerWeatherKind,
                         tripMenuExpanded = tripMenuExpanded,
-                        moreMenuExpanded = moreMenuExpanded,
                         onTripMenuExpandedChange = { tripMenuExpanded = it },
-                        onMoreMenuExpandedChange = { moreMenuExpanded = it },
                         onSelectTrip = {
                             tripSelectionVm.selectTrip(it)
                             tripMenuExpanded = false
                         },
                         onCreateTrip = {
                             tripMenuExpanded = false
-                            moreMenuExpanded = false
                             requestCreateTrip()
                         },
                         onJoinTrip = {
                             tripMenuExpanded = false
-                            moreMenuExpanded = false
                             showJoinTrip = true
                         },
                         onShareTrip = {
-                            moreMenuExpanded = false
+                            tripMenuExpanded = false
                             showShareTrip = true
                         },
                         onEditTrip = {
-                            moreMenuExpanded = false
+                            tripMenuExpanded = false
                             showEditTrip = true
                         },
                         onDeleteTrip = {
-                            moreMenuExpanded = false
+                            tripMenuExpanded = false
                             showDeleteTrip = true
                         },
                         canDeleteTrip = tripState.selectedIsOwned,
@@ -612,17 +637,13 @@ fun TripBudgetNavHost(
 }
 
 /**
- * Coastal top bar: brand | trip switcher | actions,
- * with live weather atmosphere behind (rain / storm / sun / …).
+ * Coastal top bar: brand | trip switcher (trips + trip actions).
  */
 @Composable
 private fun CoastalAppHeader(
     state: TripSelectionUiState,
-    @Suppress("UNUSED_PARAMETER") weatherKind: WeatherKind?,
     tripMenuExpanded: Boolean,
-    moreMenuExpanded: Boolean,
     onTripMenuExpandedChange: (Boolean) -> Unit,
-    onMoreMenuExpandedChange: (Boolean) -> Unit,
     onSelectTrip: (Long) -> Unit,
     onCreateTrip: () -> Unit,
     onJoinTrip: () -> Unit,
@@ -631,10 +652,14 @@ private fun CoastalAppHeader(
     onDeleteTrip: () -> Unit,
     canDeleteTrip: Boolean,
 ) {
-    // Sky / rain is drawn once behind the Scaffold; header stays transparent.
-    val ownedPillBg = if (CoastalTokens.isDark) Color(0xFF1A3D38) else Color(0xFFE8F6F5)
-    val joinedPillBorder = MaterialTheme.colorScheme.outlineVariant
     val accent = CoastalTokens.accent
+    val selectedTrip = state.selectedTrip
+    val tripInitial = selectedTrip?.name?.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (tripMenuExpanded) 180f else 0f,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "trip_chevron",
+    )
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -645,16 +670,16 @@ private fun CoastalAppHeader(
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .height(56.dp)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = stringResource(R.string.brand_name),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 fontFamily = LoraFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = CoastalTokens.ink,
+                color = Color.White,
                 maxLines = 1,
             )
 
@@ -663,162 +688,217 @@ private fun CoastalAppHeader(
             Box {
                 Row(
                     modifier = Modifier
-                        .widthIn(max = 188.dp)
-                        .clip(RoundedCornerShape(999.dp))
+                        .widthIn(max = 220.dp)
+                        .shadow(6.dp, RoundedCornerShape(18.dp), clip = false)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color.White.copy(alpha = if (CoastalTokens.isDark) 0.14f else 0.92f))
                         .border(
                             1.dp,
-                            if (state.selectedIsOwned) accent else joinedPillBorder,
-                            RoundedCornerShape(999.dp),
-                        )
-                        .background(
-                            if (state.selectedIsOwned) ownedPillBg else CoastalTokens.card,
+                            Color.White.copy(alpha = if (CoastalTokens.isDark) 0.22f else 0.55f),
+                            RoundedCornerShape(18.dp),
                         )
                         .clickable { onTripMenuExpandedChange(true) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(start = 6.dp, end = 8.dp, top = 5.dp, bottom = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        text = state.selectedTrip?.name ?: "Select trip",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = CoastalTokens.ink,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Text(
-                        text = if (state.selectedIsOwned) "Owner" else "Joined",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = if (state.selectedIsOwned) accent else CoastalTokens.muted,
-                        maxLines = 1,
-                    )
-                    Icon(
-                        Icons.Default.ExpandMore,
-                        contentDescription = "Switch trip",
-                        tint = accent,
-                        modifier = Modifier.size(18.dp),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(accent.copy(alpha = 0.92f), accent.copy(alpha = 0.72f)),
+                                ),
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            tripInitial,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontFamily = LoraFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
+                        Text(
+                            text = selectedTrip?.name ?: "Select trip",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (CoastalTokens.isDark) Color.White else CoastalTokens.ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = selectedTrip?.destination?.takeIf { it.isNotBlank() }
+                                ?: if (state.selectedIsOwned) "Your trip" else "Joined trip",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (CoastalTokens.isDark) {
+                                Color.White.copy(alpha = 0.72f)
+                            } else {
+                                CoastalTokens.muted
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (CoastalTokens.isDark) {
+                                    Color.White.copy(alpha = 0.12f)
+                                } else {
+                                    CoastalTokens.softFill
+                                },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.ExpandMore,
+                            contentDescription = "Trip menu",
+                            tint = accent,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .rotate(chevronRotation),
+                        )
+                    }
                 }
                 DropdownMenu(
                     expanded = tripMenuExpanded,
                     onDismissRequest = { onTripMenuExpandedChange(false) },
+                    shape = RoundedCornerShape(18.dp),
+                    containerColor = CoastalTokens.card,
+                    shadowElevation = 10.dp,
+                    modifier = Modifier.widthIn(min = 268.dp, max = 300.dp),
                 ) {
+                    Text(
+                        "Switch trip",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = CoastalTokens.muted,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
                     if (state.ownedTrips.isNotEmpty()) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    "Your trips",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = accent,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            },
-                            onClick = {},
-                            enabled = false,
-                        )
+                        TripMenuSectionLabel(title = "Yours", tint = accent)
                         state.ownedTrips.forEach { trip ->
                             DropdownMenuItem(
                                 text = {
-                                    TripMenuLabel(trip = trip, badge = "Owner", owned = true)
+                                    TripMenuLabel(
+                                        trip = trip,
+                                        badge = "Owner",
+                                        owned = true,
+                                        selected = trip.id == selectedTrip?.id,
+                                    )
                                 },
                                 onClick = { onSelectTrip(trip.id) },
                             )
                         }
                     }
                     if (state.joinedTrips.isNotEmpty()) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    "Joined trips",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = CoastalTokens.muted,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            },
-                            onClick = {},
-                            enabled = false,
-                        )
+                        TripMenuSectionLabel(title = "Joined", tint = CoastalTokens.muted)
                         state.joinedTrips.forEach { trip ->
                             DropdownMenuItem(
                                 text = {
-                                    TripMenuLabel(trip = trip, badge = "Joined", owned = false)
+                                    TripMenuLabel(
+                                        trip = trip,
+                                        badge = "Joined",
+                                        owned = false,
+                                        selected = trip.id == selectedTrip?.id,
+                                    )
                                 },
                                 onClick = { onSelectTrip(trip.id) },
                             )
                         }
                     }
-                    DropdownMenuItem(
-                        text = { Text("Create new trip") },
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp),
+                        color = CoastalTokens.softFillAlt,
+                    )
+                    TripMenuActionRow(
+                        icon = Icons.Default.Add,
+                        label = "Create trip",
                         onClick = onCreateTrip,
-                        leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
                     )
-                    DropdownMenuItem(
-                        text = { Text("Join trip") },
+                    TripMenuActionRow(
+                        icon = Icons.Default.GroupAdd,
+                        label = "Join with code",
                         onClick = onJoinTrip,
-                        leadingIcon = { Icon(Icons.Default.GroupAdd, contentDescription = null) },
                     )
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(accent)
-                    .clickable(onClick = onCreateTrip),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "New trip",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-
-            Box {
-                IconButton(
-                    onClick = { onMoreMenuExpandedChange(true) },
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "More",
-                        tint = CoastalTokens.muted,
-                    )
-                }
-                DropdownMenu(
-                    expanded = moreMenuExpanded,
-                    onDismissRequest = { onMoreMenuExpandedChange(false) },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Share trip") },
+                    TripMenuActionRow(
+                        icon = Icons.Default.Share,
+                        label = "Share trip",
                         onClick = onShareTrip,
-                        leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
                     )
-                    DropdownMenuItem(
-                        text = { Text("Join trip") },
-                        onClick = onJoinTrip,
-                        leadingIcon = { Icon(Icons.Default.GroupAdd, contentDescription = null) },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Edit trip") },
+                    TripMenuActionRow(
+                        icon = Icons.Default.Edit,
+                        label = "Edit trip",
                         onClick = onEditTrip,
-                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                     )
                     if (canDeleteTrip) {
-                        DropdownMenuItem(
-                            text = { Text("Delete trip") },
+                        TripMenuActionRow(
+                            icon = Icons.Default.Delete,
+                            label = "Delete trip",
                             onClick = onDeleteTrip,
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                            destructive = true,
                         )
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun TripMenuSectionLabel(
+    title: String,
+    tint: Color,
+) {
+    Text(
+        title,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = tint,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
+}
+
+@Composable
+private fun TripMenuActionRow(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    destructive: Boolean = false,
+) {
+    val tint = if (destructive) CoastalTokens.danger else CoastalTokens.ink
+    val iconBg = if (destructive) CoastalTokens.dangerSoft else CoastalTokens.softFill
+    DropdownMenuItem(
+        text = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(iconBg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+                }
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = tint,
+                )
+            }
+        },
+        onClick = onClick,
+    )
 }
 
 /** Navigation-style horizontal slide (enter full width, exit ~1/3). */
@@ -851,34 +931,92 @@ private fun TripMenuLabel(
     trip: TripEntity,
     badge: String,
     owned: Boolean,
+    selected: Boolean,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            text = buildString {
-                append(trip.name)
-                trip.destination?.let { append(" · $it") }
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (owned) FontWeight.SemiBold else FontWeight.Normal,
-            color = CoastalTokens.ink,
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    val initial = trip.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(
+                    if (owned) CoastalTokens.tealSoft else CoastalTokens.softFill,
+                ),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = badge,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Medium,
-                color = if (owned) CoastalTokens.accent else CoastalTokens.muted,
+                initial,
+                style = MaterialTheme.typography.titleSmall,
+                fontFamily = LoraFontFamily,
+                fontWeight = FontWeight.Bold,
+                color = if (owned) CoastalTokens.tealSoftFg else CoastalTokens.muted,
             )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = trip.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = CoastalTokens.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                trip.destination?.takeIf { it.isNotBlank() }?.let { dest ->
+                    Icon(
+                        Icons.Outlined.Place,
+                        contentDescription = null,
+                        tint = CoastalTokens.muted,
+                        modifier = Modifier.size(11.dp),
+                    )
+                    Text(
+                        dest,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = CoastalTokens.muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+                Text(
+                    text = badge,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (owned) CoastalTokens.tealSoftFg else CoastalTokens.muted,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(
+                            if (owned) CoastalTokens.tealSoft else CoastalTokens.softFill,
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
             TripDates.formatRange(trip)?.let { range ->
                 Text(
                     text = range,
                     style = MaterialTheme.typography.labelSmall,
-                    color = CoastalTokens.muted,
+                    color = CoastalTokens.muted.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+        if (selected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = CoastalTokens.accent,
+                modifier = Modifier.size(18.dp),
+            )
+        } else {
+            Spacer(Modifier.width(18.dp))
         }
     }
 }
