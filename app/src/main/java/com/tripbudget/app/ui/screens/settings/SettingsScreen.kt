@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tripbudget.app.R
 import com.tripbudget.app.data.HeaderWeatherPreference
 import com.tripbudget.app.data.ThemeMode
+import com.tripbudget.app.places.PlaceWeather
 import com.tripbudget.app.ui.components.EnterCascade
 import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.components.SoftScreenCanvas
@@ -64,12 +65,23 @@ import com.tripbudget.app.ui.theme.floatingNavContentPadding
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    liveWeather: PlaceWeather? = null,
+    hasLocationPermission: Boolean = false,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val headerWeather by viewModel.headerWeather.collectAsStateWithLifecycle()
     val cloud by viewModel.cloud.collectAsStateWithLifecycle()
+    // Open-Meteo label + temp (e.g. "Partly cloudy · 28°C"), not our simplified scene kind.
+    val liveWeatherSubtitle = when {
+        !hasLocationPermission -> "Location off"
+        liveWeather == null -> "Checking…"
+        else -> {
+            val temp = liveWeather.temperatureC?.let { "${it.toInt()}°C" }
+            listOfNotNull(liveWeather.label, temp).joinToString(" · ")
+        }
+    }
 
     LivePullRefresh(
         isRefreshing = isRefreshing,
@@ -166,6 +178,11 @@ fun SettingsScreen(
                     HeaderWeatherPreference.entries.forEach { preference ->
                         RowOption(
                             label = preference.label(),
+                            subtitle = if (preference == HeaderWeatherPreference.LIVE) {
+                                liveWeatherSubtitle
+                            } else {
+                                null
+                            },
                             selected = headerWeather == preference,
                             onClick = { viewModel.setHeaderWeather(preference) },
                         )
@@ -486,6 +503,7 @@ private fun RowOption(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    subtitle: String? = null,
 ) {
     Row(
         modifier = Modifier
@@ -504,6 +522,16 @@ private fun RowOption(
             onClick = null,
             colors = RadioButtonDefaults.colors(selectedColor = Teal600),
         )
-        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) Teal600 else CoastalTokens.muted,
+                )
+            }
+        }
     }
 }
+

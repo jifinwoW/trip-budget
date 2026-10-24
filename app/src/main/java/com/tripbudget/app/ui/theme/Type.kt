@@ -12,6 +12,7 @@ import com.tripbudget.app.R
  * Bundled Coastal Soft typefaces — never fall back to system fonts at runtime.
  * Lora: trip titles + prominent financial figures.
  * Inter: labels, buttons, navigation, forms, supporting text.
+ * Noto Serif Malayalam: Chilavu wordmark (ചിലവ്) — Latin fonts miss these glyphs.
  * Sized compact for dense phone UI.
  */
 val LoraFontFamily = FontFamily(
@@ -26,6 +27,10 @@ val InterFontFamily = FontFamily(
     Font(R.font.inter_medium, FontWeight.Medium),
     Font(R.font.inter_semibold, FontWeight.SemiBold),
     Font(R.font.inter_bold, FontWeight.Bold),
+)
+
+val BrandFontFamily = FontFamily(
+    Font(R.font.noto_serif_malayalam_bold, FontWeight.Bold),
 )
 
 val TripBudgetTypography = Typography(

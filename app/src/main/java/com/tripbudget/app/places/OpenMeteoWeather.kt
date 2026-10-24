@@ -18,6 +18,14 @@ enum class WeatherKind {
     UNKNOWN,
 }
 
+/** How hard rain draws in the header — from Open-Meteo codes (or storm). */
+enum class RainIntensity {
+    LIGHT,
+    MEDIUM,
+    HEAVY,
+    STORM,
+}
+
 data class PlaceWeather(
     val lat: Double,
     val lng: Double,
@@ -97,6 +105,15 @@ object OpenMeteoWeather {
         in 71..77, 85, 86 -> WeatherKind.SNOW
         in 95..99 -> WeatherKind.STORM
         else -> WeatherKind.UNKNOWN
+    }
+
+    /** Light / medium / heavy rain from WMO code; storms use [RainIntensity.STORM] separately. */
+    fun rainIntensityFromCode(code: Int?): RainIntensity = when (code) {
+        null -> RainIntensity.MEDIUM
+        51, 56, 61, 66, 80 -> RainIntensity.LIGHT
+        55, 57, 65, 67, 82 -> RainIntensity.HEAVY
+        in 51..67, in 80..82 -> RainIntensity.MEDIUM
+        else -> RainIntensity.MEDIUM
     }
 
     fun labelFor(kind: WeatherKind, code: Int): String = when (kind) {

@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -64,14 +66,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,6 +95,9 @@ import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.TripDates
 import com.tripbudget.app.location.RouteArrivalTracker
 import com.tripbudget.app.places.DeviceLocationWeather
+import com.tripbudget.app.places.OpenMeteoWeather
+import com.tripbudget.app.places.PlaceWeather
+import com.tripbudget.app.places.RainIntensity
 import com.tripbudget.app.places.WeatherKind
 import com.tripbudget.app.ui.TripSelectionUiState
 import com.tripbudget.app.ui.TripSelectionViewModel
@@ -116,11 +124,18 @@ import com.tripbudget.app.ui.screens.trips.ShareTripDialog
 import com.tripbudget.app.ui.screens.trips.TripEditorDialog
 import com.tripbudget.app.ui.theme.CoastalTokens
 import com.tripbudget.app.ui.theme.LoraFontFamily
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlin.math.abs
 
-/** Extra sky below the toolbar so hero rounded corners sit on rain, not white. */
-private val HeaderWeatherUnderHero = 36.dp
+/** Toolbar row under the status bar. ~20% taller so header weather art isn’t cropped so hard. */
+private val HeaderToolbarHeight = 67.dp
+
+/** Extra sky below the toolbar so hero rounded corners sit on weather, not white. */
+private val HeaderWeatherUnderHero = 43.dp
+
+/** Keep in sync with [navSlideTransition] duration. */
+private const val NavSlideDurationMs = 340
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -315,44 +330,70 @@ fun TripBudgetNavHost(
             val context = LocalContext.current
             val headerWeatherPref by themePreferences.headerWeather
                 .collectAsStateWithLifecycle(HeaderWeatherPreference.LIVE)
-            var headerWeatherKind by remember { mutableStateOf<WeatherKind?>(null) }
-            LaunchedEffect(headerWeatherPref, hasLocationPermission) {
-                headerWeatherKind = when (headerWeatherPref) {
-                    HeaderWeatherPreference.LIVE -> {
-                        if (hasLocationPermission) {
-                            DeviceLocationWeather.fetch(context)?.kind
-                        } else {
-                            null
-                        }
-                    }
-                    else -> headerWeatherPref.toWeatherKind()
+            var liveWeather by remember { mutableStateOf<PlaceWeather?>(null) }
+            var weatherRefreshKey by remember { mutableIntStateOf(0) }
+            // Refetch on permission, tab change, Header weather pref (e.g. back to Live),
+            // and pull-to-refresh (via weatherRefreshKey).
+            LaunchedEffect(
+                hasLocationPermission,
+                currentPage,
+                headerWeatherPref,
+                weatherRefreshKey,
+            ) {
+                liveWeather = if (hasLocationPermission) {
+                    DeviceLocationWeather.fetch(context)
+                } else {
+                    null
                 }
             }
+            fun refreshCloudAndWeather() {
+                tripSelectionVm.refreshFromCloud(force = true)
+                weatherRefreshKey += 1
+            }
+            // Live: show sunny until location weather arrives, then Crossfade to real kind.
+            val headerWeatherKind = when (headerWeatherPref) {
+                HeaderWeatherPreference.LIVE -> liveWeather?.kind ?: WeatherKind.SUNNY
+                else -> headerWeatherPref.toWeatherKind()
+            }
+            val headerRainIntensity = when {
+                headerWeatherKind == WeatherKind.STORM -> RainIntensity.STORM
+                headerWeatherKind == WeatherKind.RAIN &&
+                    headerWeatherPref == HeaderWeatherPreference.LIVE -> {
+                    OpenMeteoWeather.rainIntensityFromCode(liveWeather?.weatherCode)
+                }
+                headerWeatherKind == WeatherKind.RAIN -> RainIntensity.MEDIUM
+                else -> RainIntensity.MEDIUM
+            }
             val statusBarPad = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            // Extra under-hero strip only on Dashboard (rounded hero corners).
-            val weatherUnderHero =
-                if (pages[currentPage] == AppDestination.DASHBOARD) HeaderWeatherUnderHero else 0.dp
-            val weatherLayerHeight by animateDpAsState(
-                targetValue = statusBarPad + 56.dp + weatherUnderHero,
-                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-                label = "header_weather_height",
-            )
+            // Same weather height on every tab — Dashboard and the other pages share this strip.
+            val weatherArtHeight = statusBarPad + HeaderToolbarHeight + HeaderWeatherUnderHero
+            // Incoming page sits under the full header during the slide, then tucks up
+            // to the hero line once the page has arrived.
+            var settledPage by remember { mutableIntStateOf(currentPage) }
+            LaunchedEffect(currentPage) {
+                if (settledPage == currentPage) return@LaunchedEffect
+                delay(NavSlideDurationMs.toLong())
+                settledPage = currentPage
+            }
             Box(modifier = Modifier.fillMaxSize()) {
-            // Weather sky behind toolbar; extends under hero corners on Dashboard only.
-            // Crossfade so switching Header weather in Settings feels like the sky changing.
+            // Weather sky behind toolbar; Crossfade for Header weather changes in Settings.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(weatherLayerHeight)
+                    .height(weatherArtHeight)
                     .align(Alignment.TopCenter)
+                    .clipToBounds()
                     .zIndex(0f),
             ) {
                 Crossfade(
-                    targetState = headerWeatherKind,
+                    targetState = headerWeatherKind to headerRainIntensity,
                     animationSpec = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
                     label = "header_weather_kind",
-                    modifier = Modifier.fillMaxSize(),
-                ) { kind ->
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(weatherArtHeight)
+                        .align(Alignment.TopCenter),
+                ) { (kind, intensity) ->
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -365,6 +406,9 @@ fun TripBudgetNavHost(
                         HeaderWeatherAtmosphere(
                             kind = kind,
                             isDark = CoastalTokens.isDark,
+                            rainIntensity = intensity,
+                            // Impact in the under-hero peek (below the toolbar chip).
+                            impactHorizonRatio = 0.80f,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -375,6 +419,19 @@ fun TripBudgetNavHost(
                 topBar = {
                     CoastalAppHeader(
                         state = tripState,
+                        weatherCaption = when (headerWeatherPref) {
+                            HeaderWeatherPreference.LIVE -> {
+                                val weather = liveWeather
+                                when {
+                                    !hasLocationPermission || weather == null -> null
+                                    else -> {
+                                        val temp = weather.temperatureC?.let { "${it.toInt()}°" }
+                                        listOfNotNull(weather.label, temp).joinToString(" · ")
+                                    }
+                                }
+                            }
+                            else -> headerWeatherPref.label()
+                        },
                         tripMenuExpanded = tripMenuExpanded,
                         onTripMenuExpandedChange = { tripMenuExpanded = it },
                         onSelectTrip = {
@@ -444,6 +501,16 @@ fun TripBudgetNavHost(
                         },
                         label = "main_nav_slide",
                     ) { page ->
+                        val sectionTop by animateDpAsState(
+                            targetValue = if (page == settledPage) 0.dp else HeaderWeatherUnderHero,
+                            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                            label = "section_slide_up",
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = sectionTop),
+                        ) {
                         when (pages[page]) {
                             AppDestination.DASHBOARD -> {
                                 DashboardScreen(
@@ -452,9 +519,7 @@ fun TripBudgetNavHost(
                                     headerWeatherKind = headerWeatherKind,
                                     weatherUnderHero = HeaderWeatherUnderHero,
                                     isRefreshing = isRefreshing,
-                                    onRefresh = {
-                                        tripSelectionVm.refreshFromCloud(force = true)
-                                    },
+                                    onRefresh = { refreshCloudAndWeather() },
                                     onEditTrip = { showEditTrip = true },
                                     onViewAllExpenses = {
                                         goToPage(AppDestination.EXPENSES)
@@ -472,9 +537,7 @@ fun TripBudgetNavHost(
                                         tripId = selectedTrip.id,
                                         viewModel = expensesVm,
                                         isRefreshing = isRefreshing,
-                                        onRefresh = {
-                                            tripSelectionVm.refreshFromCloud(force = true)
-                                        },
+                                        onRefresh = { refreshCloudAndWeather() },
                                     )
                                 }
                             }
@@ -488,9 +551,7 @@ fun TripBudgetNavHost(
                                         tripId = selectedTrip.id,
                                         viewModel = membersVm,
                                         isRefreshing = isRefreshing,
-                                        onRefresh = {
-                                            tripSelectionVm.refreshFromCloud(force = true)
-                                        },
+                                        onRefresh = { refreshCloudAndWeather() },
                                     )
                                 }
                             }
@@ -502,13 +563,14 @@ fun TripBudgetNavHost(
                                 ) {
                                     SettingsScreen(
                                         viewModel = settingsVm,
+                                        liveWeather = liveWeather,
+                                        hasLocationPermission = hasLocationPermission,
                                         isRefreshing = isRefreshing,
-                                        onRefresh = {
-                                            tripSelectionVm.refreshFromCloud(force = true)
-                                        },
+                                        onRefresh = { refreshCloudAndWeather() },
                                     )
                                 }
                             }
+                        }
                         }
                     }
                 }
@@ -553,9 +615,7 @@ fun TripBudgetNavHost(
                         onClose = { showRoutePlan = false },
                         proximity = routeProximity,
                         isRefreshing = isRefreshing,
-                        onRefresh = {
-                            tripSelectionVm.refreshFromCloud(force = true)
-                        },
+                        onRefresh = { refreshCloudAndWeather() },
                     )
                 }
             }
@@ -642,6 +702,7 @@ fun TripBudgetNavHost(
 @Composable
 private fun CoastalAppHeader(
     state: TripSelectionUiState,
+    weatherCaption: String?,
     tripMenuExpanded: Boolean,
     onTripMenuExpandedChange: (Boolean) -> Unit,
     onSelectTrip: (Long) -> Unit,
@@ -669,32 +730,43 @@ private fun CoastalAppHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .height(56.dp)
+                .height(HeaderToolbarHeight)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = stringResource(R.string.brand_name),
-                style = MaterialTheme.typography.titleLarge,
-                fontFamily = LoraFontFamily,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-            )
-
-            Spacer(Modifier.weight(1f))
+            Column(modifier = Modifier.weight(1f)) {
+                Image(
+                    painter = painterResource(R.drawable.ic_brand_chilavu),
+                    contentDescription = stringResource(R.string.brand_name),
+                    modifier = Modifier
+                        .height(if (weatherCaption.isNullOrBlank()) 32.dp else 26.dp)
+                        .aspectRatio(913f / 320f),
+                    contentScale = ContentScale.Fit,
+                )
+                if (!weatherCaption.isNullOrBlank()) {
+                    Text(
+                        text = weatherCaption,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.82f),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
 
             Box {
+                // Glass chip — low opacity so header weather art stays visible underneath.
                 Row(
                     modifier = Modifier
                         .widthIn(max = 220.dp)
-                        .shadow(6.dp, RoundedCornerShape(18.dp), clip = false)
+                        .shadow(3.dp, RoundedCornerShape(18.dp), clip = false)
                         .clip(RoundedCornerShape(18.dp))
-                        .background(Color.White.copy(alpha = if (CoastalTokens.isDark) 0.14f else 0.92f))
+                        .background(Color.Black.copy(alpha = 0.22f))
                         .border(
                             1.dp,
-                            Color.White.copy(alpha = if (CoastalTokens.isDark) 0.22f else 0.55f),
+                            Color.White.copy(alpha = 0.28f),
                             RoundedCornerShape(18.dp),
                         )
                         .clickable { onTripMenuExpandedChange(true) }
@@ -706,11 +778,7 @@ private fun CoastalAppHeader(
                         modifier = Modifier
                             .size(30.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(accent.copy(alpha = 0.92f), accent.copy(alpha = 0.72f)),
-                                ),
-                            ),
+                            .background(Color.White.copy(alpha = 0.18f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -726,7 +794,7 @@ private fun CoastalAppHeader(
                             text = selectedTrip?.name ?: "Select trip",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (CoastalTokens.isDark) Color.White else CoastalTokens.ink,
+                            color = Color.White,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -734,11 +802,7 @@ private fun CoastalAppHeader(
                             text = selectedTrip?.destination?.takeIf { it.isNotBlank() }
                                 ?: if (state.selectedIsOwned) "Your trip" else "Joined trip",
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (CoastalTokens.isDark) {
-                                Color.White.copy(alpha = 0.72f)
-                            } else {
-                                CoastalTokens.muted
-                            },
+                            color = Color.White.copy(alpha = 0.78f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -747,19 +811,13 @@ private fun CoastalAppHeader(
                         modifier = Modifier
                             .size(24.dp)
                             .clip(CircleShape)
-                            .background(
-                                if (CoastalTokens.isDark) {
-                                    Color.White.copy(alpha = 0.12f)
-                                } else {
-                                    CoastalTokens.softFill
-                                },
-                            ),
+                            .background(Color.White.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             Icons.Default.ExpandMore,
                             contentDescription = "Trip menu",
-                            tint = accent,
+                            tint = Color.White.copy(alpha = 0.92f),
                             modifier = Modifier
                                 .size(16.dp)
                                 .rotate(chevronRotation),
@@ -903,7 +961,7 @@ private fun TripMenuActionRow(
 
 /** Navigation-style horizontal slide (enter full width, exit ~1/3). */
 private fun navSlideTransition(forward: Boolean): ContentTransform {
-    val duration = 340
+    val duration = NavSlideDurationMs
     val easing = FastOutSlowInEasing
     return if (forward) {
         slideInHorizontally(
@@ -934,7 +992,7 @@ private fun TripMenuLabel(
     selected: Boolean,
 ) {
     val initial = trip.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-    Row(
+    Row(    
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

@@ -1,5 +1,6 @@
 package com.tripbudget.app.ui.components
 
+import android.os.Build.VERSION.SDK_INT
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -20,6 +21,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -27,9 +29,18 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.request.ImageRequest
+import coil.request.repeatCount
 import com.tripbudget.app.R
+import com.tripbudget.app.places.RainIntensity
 import com.tripbudget.app.places.WeatherKind
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -43,6 +54,13 @@ fun HeaderWeatherAtmosphere(
     kind: WeatherKind?,
     isDark: Boolean,
     modifier: Modifier = Modifier,
+    /** From Open-Meteo when live; light vs heavy rain change density/speed. */
+    rainIntensity: RainIntensity = RainIntensity.MEDIUM,
+    /**
+     * Where rain hits (0–1 from top). Dashboard’s taller under-hero strip uses a
+     * higher line (~0.72) so splashes sit above the hero corners; other pages ~0.88.
+     */
+    impactHorizonRatio: Float = 0.88f,
 ) {
     val infinite = rememberInfiniteTransition(label = "headerWeather")
     val drift = infinite.animateFloat(
@@ -53,15 +71,6 @@ fun HeaderWeatherAtmosphere(
             repeatMode = RepeatMode.Restart,
         ),
         label = "drift",
-    )
-    val rainPhase = infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1_100, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "rain",
     )
     // Storm flash clock — long dark gaps, sudden strikes.
     val flashPhase = infinite.animateFloat(
@@ -75,6 +84,7 @@ fun HeaderWeatherAtmosphere(
     )
     // Continuous seconds — never restarts (avoids the whole field hitching).
     var snowTimeSec by remember { mutableFloatStateOf(0f) }
+    var rainTimeSec by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(kind) {
         if (kind != WeatherKind.SNOW) return@LaunchedEffect
         var lastNanos = 0L
@@ -87,16 +97,42 @@ fun HeaderWeatherAtmosphere(
             }
         }
     }
+    LaunchedEffect(kind) {
+        if (kind != WeatherKind.RAIN && kind != WeatherKind.STORM) return@LaunchedEffect
+        var lastNanos = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (lastNanos != 0L) {
+                    rainTimeSec += (now - lastNanos) / 1_000_000_000f
+                }
+                lastNanos = now
+            }
+        }
+    }
 
+    // Pluvia-style layered rain: far / mid / near parallax (dense enough to read in a short header).
     val rainDrops = remember {
-        List(48) { i ->
+        List(180) { i ->
             val rnd = Random(40 + i)
+            val layerRoll = rnd.nextFloat()
+            val layer = when {
+                layerRoll < 0.30f -> 0
+                layerRoll < 0.70f -> 1
+                else -> 2
+            }
+            val z = when (layer) {
+                0 -> 0.40f
+                1 -> 0.72f
+                else -> 1f
+            }
             RainDrop(
                 x = rnd.nextFloat(),
                 y = rnd.nextFloat(),
-                len = 0.65f + rnd.nextFloat() * 0.55f,
-                speed = 0.75f + rnd.nextFloat() * 0.7f,
-                alpha = 0.55f + rnd.nextFloat() * 0.45f,
+                len = (0.65f + rnd.nextFloat() * 0.75f) * z,
+                speed = (1.0f + rnd.nextFloat() * 0.65f) * z,
+                alpha = (0.28f + rnd.nextFloat() * 0.48f) * z,
+                thickness = (0.85f + rnd.nextFloat() * 1.25f) * z,
+                layer = layer,
             )
         }
     }
@@ -123,32 +159,47 @@ fun HeaderWeatherAtmosphere(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        val sceneRes = when (kind) {
-            WeatherKind.SUNNY -> R.drawable.bg_header_sunny
-            WeatherKind.CLOUDY -> R.drawable.bg_header_cloudy
-            WeatherKind.FOG -> R.drawable.bg_header_fog
-            WeatherKind.RAIN -> R.drawable.bg_header_rain
-            WeatherKind.STORM -> R.drawable.bg_header_storm
-            WeatherKind.SNOW -> R.drawable.bg_header_snow
+        // Header scenes are GIFs from res/raw.
+        val animatedSceneRes = when (kind) {
+            WeatherKind.SUNNY -> R.raw.header_weather_sunny
+            WeatherKind.CLOUDY -> R.raw.header_weather_cloudy
+            WeatherKind.RAIN -> R.raw.header_weather_rain
+            WeatherKind.STORM -> R.raw.header_weather_storm
+            WeatherKind.FOG -> R.raw.header_weather_fog
+            WeatherKind.SNOW -> R.raw.header_weather_snow
             else -> null
         }
-        if (sceneRes != null) {
+        val sceneRes = when (kind) {
+            WeatherKind.SUNNY -> null
+            WeatherKind.CLOUDY -> null
+            WeatherKind.FOG -> null
+            WeatherKind.RAIN -> null
+            WeatherKind.STORM -> null
+            WeatherKind.SNOW -> null
+            else -> null
+        }
+        if (animatedSceneRes != null || sceneRes != null) {
             // Wash fills clear top; scene art sits across the header.
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawRect(brush = Brush.verticalGradient(headerWash(kind, isDark)))
             }
-            Image(
-                painter = painterResource(sceneRes),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                // Left-weighted cottage scenes — keep Start when cropping.
-                alignment = if (kind == WeatherKind.RAIN) {
-                    Alignment.BottomCenter
-                } else {
-                    Alignment.BottomStart
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
+            val sceneAlignment = Alignment.BottomStart
+            if (animatedSceneRes != null) {
+                HeaderWeatherAnimatedScene(
+                    rawRes = animatedSceneRes,
+                    alignment = sceneAlignment,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (sceneRes != null) {
+                Image(
+                    painter = painterResource(sceneRes),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    // Left-weighted cottage scenes — keep Start when cropping.
+                    alignment = sceneAlignment,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawRect(
                     brush = Brush.verticalGradient(
@@ -159,39 +210,11 @@ fun HeaderWeatherAtmosphere(
                         ),
                     ),
                 )
+                // GIFs already include rain, lightning, and snow.
                 when (kind) {
-                    WeatherKind.RAIN -> drawRain(
-                        size.width,
-                        size.height,
-                        rainPhase.value,
-                        rainDrops,
-                        isDark,
-                    )
-                    WeatherKind.STORM -> {
-                        drawRain(
-                            size.width,
-                            size.height,
-                            rainPhase.value,
-                            rainDrops,
-                            isDark,
-                            heavier = true,
-                        )
-                        drawLightning(
-                            size.width,
-                            size.height,
-                            flashPhase.value,
-                            lightningBolts,
-                            isDark,
-                        )
-                    }
-                    WeatherKind.SNOW -> drawSnow(
-                        size.width,
-                        size.height,
-                        snowTimeSec / 3.6f,
-                        snowFlakes,
-                        isDark,
-                    )
-                    else -> Unit // sunny / cloudy / fog: illustration only
+                    WeatherKind.SUNNY, WeatherKind.CLOUDY, WeatherKind.FOG,
+                    WeatherKind.RAIN, WeatherKind.STORM, WeatherKind.SNOW,
+                    WeatherKind.UNKNOWN, null -> Unit
                 }
             }
         } else {
@@ -215,6 +238,43 @@ fun HeaderWeatherAtmosphere(
             }
         }
     }
+}
+
+/** GIF/WebP/JPEG scene from res/raw — Coil so cloudy (and later others) can animate. */
+@Composable
+private fun HeaderWeatherAnimatedScene(
+    rawRes: Int,
+    alignment: Alignment,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val gifLoader = remember {
+        ImageLoader.Builder(context)
+            .components {
+                // Prefer GifDecoder — ImageDecoder + hardware bitmaps often show a still frame.
+                add(GifDecoder.Factory())
+                if (SDK_INT >= 28) {
+                    add(ImageDecoderDecoder.Factory())
+                }
+            }
+            .build()
+    }
+    val request = remember(rawRes) {
+        ImageRequest.Builder(context)
+            .data(rawRes)
+            .allowHardware(false)
+            .repeatCount(-1) // loop forever
+            .crossfade(false)
+            .build()
+    }
+    AsyncImage(
+        model = request,
+        imageLoader = gifLoader,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        alignment = alignment,
+        modifier = modifier,
+    )
 }
 
 /**
@@ -383,45 +443,180 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSnowSky(
     )
 }
 
+/**
+ * Atmospheric rain inspired by Pluvia-style simulation:
+ * 3 depth layers, wind angle, soft gradient streaks, and an impact horizon
+ * (wet ground band + splash/ripple) near the bottom of the header strip.
+ * [timeSec] is unbounded seconds so the field never hitch-restarts.
+ */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRain(
     w: Float,
     h: Float,
-    phase: Float,
+    timeSec: Float,
     drops: List<RainDrop>,
     isDark: Boolean,
-    heavier: Boolean = false,
+    intensity: RainIntensity = RainIntensity.MEDIUM,
+    impactHorizonRatio: Float = 0.88f,
 ) {
     clipRect {
-        val tilt = 0.2f
-        // Light header sky needs stronger streaks to read; dark mode stays a bit softer.
-        val baseAlpha = if (isDark) 0.78f else 0.92f
-        val count = if (heavier) drops.size else drops.size
-        for (i in 0 until count) {
-            val d = drops[i]
-            val y = ((d.y + phase * d.speed) % 1.15f) - 0.08f
-            val x = d.x * w
-            val len = h * (0.22f + d.len * 0.28f) * if (heavier) 1.2f else 1f
-            val x1 = x
-            val y1 = y * h
-            val x2 = x - tilt * len
-            val y2 = y1 + len
-            val a = (baseAlpha * d.alpha * if (heavier) 1.1f else 1f).coerceIn(0f, 1f)
-            drawLine(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0f),
-                        Color.White.copy(alpha = a),
-                        Color.White.copy(alpha = a * 0.85f),
-                        Color.White.copy(alpha = 0f),
-                    ),
-                    start = Offset(x1, y1),
-                    end = Offset(x2, y2),
+        // Density / speed / wind scale with light → heavy → storm.
+        val windDeg = when (intensity) {
+            RainIntensity.LIGHT -> 10f
+            RainIntensity.MEDIUM -> 16f
+            RainIntensity.HEAVY -> 24f
+            RainIntensity.STORM -> 30f
+        }
+        val speedMul = when (intensity) {
+            RainIntensity.LIGHT -> 0.95f
+            RainIntensity.MEDIUM -> 1.45f
+            RainIntensity.HEAVY -> 1.75f
+            RainIntensity.STORM -> 1.95f
+        }
+        // Draw every Nth drop — light rain is sparse, storm uses the full set.
+        val dropStride = when (intensity) {
+            RainIntensity.LIGHT -> 3
+            RainIntensity.MEDIUM -> 2
+            RainIntensity.HEAVY -> 1
+            RainIntensity.STORM -> 1
+        }
+        val lengthMul = when (intensity) {
+            RainIntensity.LIGHT -> 0.85f
+            RainIntensity.MEDIUM -> 1.12f
+            RainIntensity.HEAVY -> 1.28f
+            RainIntensity.STORM -> 1.35f
+        }
+        val strokeMul = when (intensity) {
+            RainIntensity.LIGHT -> 0.95f
+            RainIntensity.MEDIUM -> 1.25f
+            RainIntensity.HEAVY -> 1.45f
+            RainIntensity.STORM -> 1.55f
+        }
+        val alphaMul = when (intensity) {
+            RainIntensity.LIGHT -> 0.88f
+            RainIntensity.MEDIUM -> 1.08f
+            RainIntensity.HEAVY -> 1.18f
+            RainIntensity.STORM -> 1.25f
+        }
+        val rad = Math.toRadians(windDeg.toDouble()).toFloat()
+        val sinW = sin(rad)
+        val cosW = cos(rad)
+        val tint = Color(0xFFD7EBFF) // cool rain tint (not pure white)
+        val baseBoost = (if (isDark) 1.15f else 1.25f) * alphaMul
+        // Fall units: ~1 full header height per second at speed 1.
+        val fallRate = 1.35f * speedMul
+
+        // Impact horizon — Pluvia-style ground line (higher on Dashboard’s tall strip).
+        val impactRatio = impactHorizonRatio.coerceIn(0.55f, 0.95f)
+        val impactY = h * impactRatio
+
+        // Wet ground plane: mist rising into the horizon + thin reflection sheen.
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    Color(0xFF1E293B).copy(alpha = if (isDark) 0.14f else 0.10f),
+                    Color(0xFF0F172A).copy(alpha = if (isDark) 0.22f else 0.16f),
                 ),
-                start = Offset(x1, y1),
-                end = Offset(x2, y2),
-                strokeWidth = if (heavier) 2.4f else 2.1f,
-                cap = StrokeCap.Round,
-            )
+                startY = impactY - h * 0.22f,
+                endY = h,
+            ),
+        )
+        drawLine(
+            brush = Brush.horizontalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    tint.copy(alpha = if (isDark) 0.22f else 0.28f),
+                    tint.copy(alpha = if (isDark) 0.18f else 0.22f),
+                    Color.Transparent,
+                ),
+            ),
+            start = Offset(0f, impactY),
+            end = Offset(w, impactY),
+            strokeWidth = 1.2f,
+            cap = StrokeCap.Round,
+        )
+
+        for ((index, d) in drops.withIndex()) {
+            if (index % dropStride != 0) continue
+            // Continuous wrap on Y; slight X drift from wind so columns don't stack.
+            val fall = ((d.y + timeSec * d.speed * fallRate) % 1.35f + 1.35f) % 1.35f - 0.12f
+            val windDrift = (timeSec * d.speed * fallRate * sinW * 0.22f + d.x * 3.1f) % 1.2f
+            val nx = ((d.x + windDrift) % 1.2f + 1.2f) % 1.2f - 0.1f
+
+            // Parallax surface: near drops hit a touch lower, far drops a touch higher.
+            val layerImpactY = impactY + when (d.layer) {
+                2 -> h * 0.03f
+                1 -> 0f
+                else -> -h * 0.025f
+            }
+
+            val rawHeadX = nx * w
+            val rawHeadY = fall * h
+            // Streaks stop at the horizon — they don't fall through the ground.
+            val hit = rawHeadY >= layerImpactY
+            val headY = rawHeadY.coerceAtMost(layerImpactY)
+            val streakLen = h * (0.22f + d.len * 0.48f) * lengthMul
+            val headX = rawHeadX
+            val tailX = headX - sinW * streakLen
+            val tailY = headY - cosW * streakLen
+            val a = (d.alpha * baseBoost).coerceIn(0f, 0.95f)
+            val stroke = (d.thickness * strokeMul).coerceIn(0.55f, 3.2f)
+
+            // Only draw the falling streak while it's still above / just hitting the horizon.
+            if (!hit || rawHeadY < layerImpactY + h * 0.05f) {
+                drawLine(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            tint.copy(alpha = 0f),
+                            tint.copy(alpha = a * 0.55f),
+                            tint.copy(alpha = a),
+                        ),
+                        start = Offset(tailX, tailY),
+                        end = Offset(headX, headY),
+                    ),
+                    start = Offset(tailX, tailY),
+                    end = Offset(headX, headY),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round,
+                )
+            }
+
+            // Splash + ripple on the impact horizon (mid/near layers).
+            if (d.layer >= 1 && hit) {
+                val past = ((rawHeadY - layerImpactY) / (h * 0.12f)).coerceIn(0f, 1f)
+                val life = (1f - past)
+                if (life > 0.05f) {
+                    val sx = headX
+                    val sy = layerImpactY
+                    val splashA = a * 0.9f * life
+                    // Upward splash droplets (Pluvia-style bounce).
+                    val lift = past * (6f + d.layer * 4f)
+                    val spread = past * (5f + d.layer * 3f)
+                    drawCircle(
+                        color = tint.copy(alpha = splashA),
+                        radius = 1.4f + d.layer * 0.7f,
+                        center = Offset(sx - spread, sy - lift),
+                    )
+                    drawCircle(
+                        color = tint.copy(alpha = splashA * 0.75f),
+                        radius = 1.1f + d.layer * 0.5f,
+                        center = Offset(sx + spread * 0.85f, sy - lift * 0.75f),
+                    )
+                    drawCircle(
+                        color = tint.copy(alpha = splashA * 0.55f),
+                        radius = 0.9f + d.layer * 0.35f,
+                        center = Offset(sx + spread * 0.15f, sy - lift * 1.15f),
+                    )
+                    // Expanding squashed ripple on the wet plane.
+                    val rippleR = 3f + past * (10f + d.layer * 6f)
+                    drawOval(
+                        color = tint.copy(alpha = splashA * 0.4f * life),
+                        topLeft = Offset(sx - rippleR, sy - rippleR * 0.28f),
+                        size = Size(rippleR * 2f, rippleR * 0.56f),
+                        style = Stroke(width = 0.9f),
+                    )
+                }
+            }
         }
     }
 }
@@ -706,6 +901,9 @@ private data class RainDrop(
     val len: Float,
     val speed: Float,
     val alpha: Float,
+    val thickness: Float,
+    /** 0 = far haze, 1 = mid, 2 = near / foreground. */
+    val layer: Int,
 )
 
 private data class SnowFlake(
