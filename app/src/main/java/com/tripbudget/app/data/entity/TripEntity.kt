@@ -11,7 +11,10 @@ import androidx.room.PrimaryKey
 data class TripEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
+    /** Place name chosen for this trip. Weather uses [placeLat] and [placeLng]. */
     val destination: String? = null,
+    val placeLat: Double? = null,
+    val placeLng: Double? = null,
     val plannedBudgetPaise: Long,
     /** Inclusive trip start, as LocalDate epoch day. Null for trips created before date range existed. */
     val startDateEpochDay: Long? = null,

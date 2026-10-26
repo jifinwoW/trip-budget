@@ -104,7 +104,7 @@ import com.tripbudget.app.domain.TripDates
 import com.tripbudget.app.location.RouteArrivalTracker
 import com.tripbudget.app.location.isDeviceLocationEnabled
 import com.tripbudget.app.location.promptEnableDeviceLocation
-import com.tripbudget.app.places.DeviceLocationWeather
+import com.tripbudget.app.places.LatLng
 import com.tripbudget.app.places.OpenMeteoWeather
 import com.tripbudget.app.places.PlaceWeather
 import com.tripbudget.app.places.RainIntensity
@@ -381,9 +381,10 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = null,
                     onDismiss = { showCreateTrip = false },
-                    onSave = { name, budget, startDate, endDate, onResult ->
+                    onSave = { name, place, budget, startDate, endDate, onResult ->
                         tripSelectionVm.createTrip(
                             name,
+                            place,
                             budget,
                             startDate,
                             endDate,
@@ -398,22 +399,22 @@ fun TripBudgetNavHost(
             if (selectedTrip == null) {
                 LoadingContent()
             } else {
-            val context = LocalContext.current
             val headerWeatherPref by themePreferences.headerWeather
                 .collectAsStateWithLifecycle(HeaderWeatherPreference.LIVE)
             var liveWeather by remember { mutableStateOf<PlaceWeather?>(null) }
             var weatherRefreshKey by remember { mutableIntStateOf(0) }
-            // Refetch on permission, tab change, Header weather pref (e.g. back to Live),
-            // and pull-to-refresh (via weatherRefreshKey).
+            // Header weather follows the trip place, not the phone's GPS.
+            val placeLat = selectedTrip.placeLat
+            val placeLng = selectedTrip.placeLng
             LaunchedEffect(
-                hasLocationPermission,
-                locationAccessTick,
+                placeLat,
+                placeLng,
                 currentPage,
                 headerWeatherPref,
                 weatherRefreshKey,
             ) {
-                liveWeather = if (hasLocationPermission) {
-                    DeviceLocationWeather.fetch(context)
+                liveWeather = if (placeLat != null && placeLng != null) {
+                    OpenMeteoWeather.fetchCurrent(listOf(LatLng(placeLat, placeLng))).firstOrNull()
                 } else {
                     null
                 }
@@ -516,7 +517,7 @@ fun TripBudgetNavHost(
                             HeaderWeatherPreference.LIVE -> {
                                 val weather = liveWeather
                                 when {
-                                    !hasLocationPermission || weather == null -> null
+                                    weather == null -> null
                                     else -> {
                                         val temp = weather.temperatureC?.let { "${it.toInt()}°" }
                                         listOfNotNull(weather.label, temp).joinToString(" · ")
@@ -733,9 +734,10 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = null,
                     onDismiss = { showCreateTrip = false },
-                    onSave = { name, budget, startDate, endDate, onResult ->
+                    onSave = { name, place, budget, startDate, endDate, onResult ->
                         tripSelectionVm.createTrip(
                             name,
+                            place,
                             budget,
                             startDate,
                             endDate,
@@ -748,10 +750,11 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = selectedTrip,
                     onDismiss = { showEditTrip = false },
-                    onSave = { name, budget, startDate, endDate, onResult ->
+                    onSave = { name, place, budget, startDate, endDate, onResult ->
                         tripSelectionVm.updateTrip(
                             selectedTrip,
                             name,
+                            place,
                             budget,
                             startDate,
                             endDate,

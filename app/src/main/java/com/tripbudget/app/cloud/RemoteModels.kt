@@ -9,6 +9,8 @@ data class RemoteTrip(
     @SerialName("owner_id") val ownerId: String,
     val name: String,
     val destination: String? = null,
+    @SerialName("place_lat") val placeLat: Double? = null,
+    @SerialName("place_lng") val placeLng: Double? = null,
     @SerialName("planned_budget_paise") val plannedBudgetPaise: Long,
     @SerialName("start_date_epoch_day") val startDateEpochDay: Long? = null,
     @SerialName("end_date_epoch_day") val endDateEpochDay: Long? = null,

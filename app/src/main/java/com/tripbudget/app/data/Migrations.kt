@@ -140,4 +140,12 @@ object Migrations {
             )
         }
     }
+
+    /** v6 → v7: trip place coordinates for header weather. */
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `trips` ADD COLUMN `placeLat` REAL")
+            db.execSQL("ALTER TABLE `trips` ADD COLUMN `placeLng` REAL")
+        }
+    }
 }

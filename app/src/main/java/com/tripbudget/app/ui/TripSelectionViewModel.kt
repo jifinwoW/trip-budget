@@ -10,6 +10,7 @@ import com.tripbudget.app.cloud.friendlyCloudError
 import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.Money
+import com.tripbudget.app.places.TripPlace
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -101,6 +102,7 @@ class TripSelectionViewModel(
 
     fun createTrip(
         name: String,
+        place: TripPlace?,
         budgetRupees: String,
         startDate: LocalDate,
         endDate: LocalDate,
@@ -124,6 +126,9 @@ class TripSelectionViewModel(
             val id = repository.insertTrip(
                 TripEntity(
                     name = trimmedName,
+                    destination = place?.name,
+                    placeLat = place?.lat,
+                    placeLng = place?.lng,
                     plannedBudgetPaise = paise,
                     startDateEpochDay = startDate.toEpochDay(),
                     endDateEpochDay = endDate.toEpochDay(),
@@ -138,6 +143,7 @@ class TripSelectionViewModel(
     fun updateTrip(
         trip: TripEntity,
         name: String,
+        place: TripPlace?,
         budgetRupees: String,
         startDate: LocalDate,
         endDate: LocalDate,
@@ -161,7 +167,9 @@ class TripSelectionViewModel(
             repository.updateTrip(
                 trip.copy(
                     name = trimmedName,
-                    destination = null,
+                    destination = place?.name,
+                    placeLat = place?.lat,
+                    placeLng = place?.lng,
                     plannedBudgetPaise = paise,
                     startDateEpochDay = startDate.toEpochDay(),
                     endDateEpochDay = endDate.toEpochDay(),

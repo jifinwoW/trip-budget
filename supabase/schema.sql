@@ -11,6 +11,8 @@ create table if not exists public.trips (
     owner_id uuid not null references auth.users (id) on delete cascade,
     name text not null,
     destination text,
+    place_lat double precision,
+    place_lng double precision,
     planned_budget_paise bigint not null,
     start_date_epoch_day bigint,
     end_date_epoch_day bigint,

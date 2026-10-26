@@ -24,7 +24,7 @@ import com.tripbudget.app.data.entity.TripEntity
         ExpenseEntity::class,
         RouteStopEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -48,6 +48,7 @@ abstract class TripBudgetDatabase : RoomDatabase() {
                     Migrations.MIGRATION_3_4,
                     Migrations.MIGRATION_4_5,
                     Migrations.MIGRATION_5_6,
+                    Migrations.MIGRATION_6_7,
                 )
                 // Do not use fallbackToDestructiveMigration — that erases user data.
                 .build()

@@ -214,7 +214,9 @@ class SyncEngine(
             id = remoteId,
             ownerId = ownerId,
             name = trip.name,
-            destination = null,
+            destination = trip.destination,
+            placeLat = trip.placeLat,
+            placeLng = trip.placeLng,
             plannedBudgetPaise = trip.plannedBudgetPaise,
             startDateEpochDay = trip.startDateEpochDay,
             endDateEpochDay = trip.endDateEpochDay,
@@ -254,6 +256,8 @@ class SyncEngine(
                 {
                     set("name", remote.name)
                     set("destination", remote.destination)
+                    set("place_lat", remote.placeLat)
+                    set("place_lng", remote.placeLng)
                     set("planned_budget_paise", remote.plannedBudgetPaise)
                     set("start_date_epoch_day", remote.startDateEpochDay)
                     set("end_date_epoch_day", remote.endDateEpochDay)
@@ -382,7 +386,9 @@ class SyncEngine(
             val entity = TripEntity(
                 id = existing?.id ?: 0,
                 name = remote.name,
-                destination = null,
+                destination = remote.destination,
+                placeLat = remote.placeLat,
+                placeLng = remote.placeLng,
                 plannedBudgetPaise = remote.plannedBudgetPaise,
                 startDateEpochDay = remote.startDateEpochDay,
                 endDateEpochDay = remote.endDateEpochDay,
@@ -620,6 +626,8 @@ class SyncEngine(
                 {
                     set("name", remote.name)
                     set("destination", remote.destination)
+                    set("place_lat", remote.placeLat)
+                    set("place_lng", remote.placeLng)
                     set("planned_budget_paise", remote.plannedBudgetPaise)
                     set("start_date_epoch_day", remote.startDateEpochDay)
                     set("end_date_epoch_day", remote.endDateEpochDay)
