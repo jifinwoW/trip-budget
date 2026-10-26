@@ -47,7 +47,6 @@ fun TripEditorDialog(
     onDismiss: () -> Unit,
     onSave: (
         name: String,
-        destination: String?,
         budgetRupees: String,
         startDate: LocalDate,
         endDate: LocalDate,
@@ -55,7 +54,6 @@ fun TripEditorDialog(
     ) -> Unit,
 ) {
     var name by remember(existing) { mutableStateOf(existing?.name.orEmpty()) }
-    var destination by remember(existing) { mutableStateOf(existing?.destination.orEmpty()) }
     var budget by remember(existing) {
         mutableStateOf(existing?.let { Money.paiseToRupeesString(it.plannedBudgetPaise) }.orEmpty())
     }
@@ -126,14 +124,6 @@ fun TripEditorDialog(
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = destination,
-                onValueChange = { destination = it },
-                label = { Text("Destination (optional)") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
             DatePickerField(
                 value = startDate,
                 onValueChange = { picked ->
@@ -171,7 +161,7 @@ fun TripEditorDialog(
                         dateError = "End date must be on or after start"
                         return@PrimaryCoastalButton
                     }
-                    onSave(name, destination, budget, startDate, endDate) { result ->
+                    onSave(name, budget, startDate, endDate) { result ->
                         when {
                             result == null -> onDismiss()
                             result.contains("date", ignoreCase = true) -> dateError = result

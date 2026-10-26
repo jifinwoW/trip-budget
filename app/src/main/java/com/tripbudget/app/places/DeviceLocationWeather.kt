@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Current-location weather for ambient UI (header atmosphere).
- * Uses last/current GPS when permission is already granted — never prompts.
+ * Uses last/current GPS when permission is already granted.
  */
 object DeviceLocationWeather {
     @SuppressLint("MissingPermission")

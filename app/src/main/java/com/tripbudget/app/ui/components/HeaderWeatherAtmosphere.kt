@@ -164,7 +164,7 @@ fun HeaderWeatherAtmosphere(
             WeatherKind.SUNNY -> R.raw.header_weather_sunny
             WeatherKind.CLOUDY -> R.raw.header_weather_cloudy
             WeatherKind.RAIN -> R.raw.header_weather_rain
-            WeatherKind.STORM -> R.raw.header_weather_storm
+            WeatherKind.STORM -> R.raw.storm
             WeatherKind.FOG -> R.raw.header_weather_fog
             WeatherKind.SNOW -> R.raw.header_weather_snow
             else -> null

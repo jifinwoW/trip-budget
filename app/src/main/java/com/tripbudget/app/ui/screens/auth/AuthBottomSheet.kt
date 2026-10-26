@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.tripbudget.app.cloud.AuthRepository
+import com.tripbudget.app.cloud.friendlyAuthError
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
 import com.tripbudget.app.ui.components.SecondaryCoastalButton
 import kotlinx.coroutines.launch
@@ -77,7 +78,7 @@ fun AuthBottomSheet(
                     }
                 },
                 onFailure = { err ->
-                    error = err.message ?: if (signUp) "Sign up failed" else "Sign in failed"
+                    error = friendlyAuthError(err, signingUp = signUp)
                 },
             )
         }

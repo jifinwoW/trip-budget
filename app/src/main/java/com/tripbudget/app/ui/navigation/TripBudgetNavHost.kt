@@ -1,5 +1,11 @@
 package com.tripbudget.app.ui.navigation
 
+import android.Manifest
+import android.content.Intent
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.Crossfade
@@ -46,7 +52,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -80,6 +85,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -96,6 +102,8 @@ import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.TripDates
 import com.tripbudget.app.location.RouteArrivalTracker
+import com.tripbudget.app.location.isDeviceLocationEnabled
+import com.tripbudget.app.location.promptEnableDeviceLocation
 import com.tripbudget.app.places.DeviceLocationWeather
 import com.tripbudget.app.places.OpenMeteoWeather
 import com.tripbudget.app.places.PlaceWeather
@@ -173,13 +181,40 @@ fun TripBudgetNavHost(
     val membersVm: MembersViewModel = viewModel(
         factory = MembersViewModel.factory(repository, tripIdFlow),
     )
+    val context = LocalContext.current
     var hasLocationPermission by remember {
         mutableStateOf(routeArrivalTracker?.hasLocationPermission() == true)
+    }
+    var askedLocationPermission by remember { mutableStateOf(false) }
+    var askedEnableLocation by remember { mutableStateOf(false) }
+    var locationAccessTick by remember { mutableIntStateOf(0) }
+    val locationSettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { locationAccessTick += 1 }
+    val locationSourceSettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { locationAccessTick += 1 }
+    fun promptLocationServices() {
+        if (isDeviceLocationEnabled(context) || askedEnableLocation) return
+        askedEnableLocation = true
+        promptEnableDeviceLocation(
+            context,
+            onResolution = { sender ->
+                locationSettingsLauncher.launch(IntentSenderRequest.Builder(sender).build())
+            },
+            onUnavailable = {
+                locationSourceSettingsLauncher.launch(
+                    Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS),
+                )
+            },
+        )
     }
     val locationPermissionLauncher = rememberRouteLocationPermissionLauncher { granted ->
         hasLocationPermission = granted || routeArrivalTracker?.hasLocationPermission() == true
         if (hasLocationPermission) {
             routeArrivalTracker?.onPermissionGranted()
+            locationAccessTick += 1
+            promptLocationServices()
         }
     }
     val emptyProximity = remember {
@@ -203,6 +238,22 @@ fun TripBudgetNavHost(
     val authUser by tripSelectionVm.authUser.collectAsStateWithLifecycle()
     val isRefreshing by tripSelectionVm.isRefreshing.collectAsStateWithLifecycle()
     val authResolving by authRepository.isAuthResolving.collectAsStateWithLifecycle(initialValue = true)
+    LaunchedEffect(authResolving) {
+        if (authResolving) return@LaunchedEffect
+        if (!hasLocationPermission) {
+            if (!askedLocationPermission) {
+                askedLocationPermission = true
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                    ),
+                )
+            }
+        } else {
+            promptLocationServices()
+        }
+    }
     val pages = remember { AppDestination.entries }
     var currentPage by remember { mutableIntStateOf(0) }
 
@@ -215,6 +266,10 @@ fun TripBudgetNavHost(
     var showSignIn by remember { mutableStateOf(false) }
     var showRoutePlan by remember { mutableStateOf(false) }
     var tripMenuExpanded by remember { mutableStateOf(false) }
+    // Sign-in wipes the local cache, so the trip list is empty until the first pull.
+    // Hold the loader through that pull instead of flashing Create / Join.
+    var awaitingFirstSync by remember(authUser?.id) { mutableStateOf(authUser != null) }
+    var firstSyncStarted by remember(authUser?.id) { mutableStateOf(false) }
 
     // Only react to settled auth. Never wipe local data here — that race destroyed
     // trips when the app resumed and session briefly looked empty.
@@ -235,6 +290,15 @@ fun TripBudgetNavHost(
             tripSelectionVm.startLiveSync()
         }
     }
+    LaunchedEffect(isRefreshing) {
+        if (authUser != null && isRefreshing) firstSyncStarted = true
+    }
+    LaunchedEffect(firstSyncStarted, isRefreshing, tripState.isLoading, tripState.trips.size) {
+        if (!awaitingFirstSync || authUser == null || tripState.isLoading) return@LaunchedEffect
+        if (tripState.trips.isNotEmpty() || (firstSyncStarted && !isRefreshing)) {
+            awaitingFirstSync = false
+        }
+    }
 
     fun goToPage(destination: AppDestination) {
         val index = pages.indexOf(destination)
@@ -250,7 +314,8 @@ fun TripBudgetNavHost(
     }
 
     when {
-        authResolving || tripState.isLoading -> {
+        authResolving || tripState.isLoading ||
+            (authUser != null && tripState.trips.isEmpty() && awaitingFirstSync) -> {
             LoadingContent()
         }
         authUser == null -> {
@@ -316,10 +381,9 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = null,
                     onDismiss = { showCreateTrip = false },
-                    onSave = { name, destination, budget, startDate, endDate, onResult ->
+                    onSave = { name, budget, startDate, endDate, onResult ->
                         tripSelectionVm.createTrip(
                             name,
-                            destination,
                             budget,
                             startDate,
                             endDate,
@@ -343,6 +407,7 @@ fun TripBudgetNavHost(
             // and pull-to-refresh (via weatherRefreshKey).
             LaunchedEffect(
                 hasLocationPermission,
+                locationAccessTick,
                 currentPage,
                 headerWeatherPref,
                 weatherRefreshKey,
@@ -543,7 +608,8 @@ fun TripBudgetNavHost(
                         )
                         val pull = if (page == currentPage) pullVisual.coerceIn(0f, 1f) else 0f
                         // Stop at the bottom of the header weather, not further down the page.
-                        val sectionTop = riseTop + HeaderWeatherUnderHero * pull
+                        val sectionTop = (riseTop + HeaderWeatherUnderHero * pull)
+                            .coerceAtMost(HeaderWeatherUnderHero)
                         val sectionCorner = riseCorner * (1f - pull)
                         Box(
                             modifier = Modifier
@@ -557,8 +623,10 @@ fun TripBudgetNavHost(
                                     viewModel = dashboardVm,
                                     headerWeatherKind = headerWeatherKind,
                                     weatherUnderHero = HeaderWeatherUnderHero,
+                                    heroCorner = sectionCorner,
                                     isRefreshing = isRefreshing,
                                     onRefresh = { refreshCloudAndWeather() },
+                                    onPullProgress = onPullProgress,
                                     onEditTrip = { showEditTrip = true },
                                     onViewAllExpenses = {
                                         goToPage(AppDestination.EXPENSES)
@@ -631,8 +699,8 @@ fun TripBudgetNavHost(
                         onRequestLocationPermission = {
                             locationPermissionLauncher.launch(
                                 arrayOf(
-                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION,
                                 ),
                             )
                         },
@@ -665,10 +733,9 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = null,
                     onDismiss = { showCreateTrip = false },
-                    onSave = { name, destination, budget, startDate, endDate, onResult ->
+                    onSave = { name, budget, startDate, endDate, onResult ->
                         tripSelectionVm.createTrip(
                             name,
-                            destination,
                             budget,
                             startDate,
                             endDate,
@@ -681,11 +748,10 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = selectedTrip,
                     onDismiss = { showEditTrip = false },
-                    onSave = { name, destination, budget, startDate, endDate, onResult ->
+                    onSave = { name, budget, startDate, endDate, onResult ->
                         tripSelectionVm.updateTrip(
                             selectedTrip,
                             name,
-                            destination,
                             budget,
                             startDate,
                             endDate,
@@ -745,7 +811,6 @@ private fun CoastalAppHeader(
 ) {
     val accent = CoastalTokens.accent
     val selectedTrip = state.selectedTrip
-    val tripInitial = selectedTrip?.name?.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
     val chevronRotation by animateFloatAsState(
         targetValue = if (tripMenuExpanded) 180f else 0f,
         animationSpec = tween(220, easing = FastOutSlowInEasing),
@@ -804,39 +869,16 @@ private fun CoastalAppHeader(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color.White.copy(alpha = 0.18f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            tripInitial,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontFamily = LoraFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f, fill = false)) {
-                        Text(
-                            text = selectedTrip?.name ?: "Select trip",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = selectedTrip?.destination?.takeIf { it.isNotBlank() }
-                                ?: if (state.selectedIsOwned) "Your trip" else "Joined trip",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.78f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Text(
+                        text = selectedTrip?.name ?: "Select trip",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
                     Box(
                         modifier = Modifier
                             .size(24.dp)
@@ -1001,7 +1043,7 @@ private fun RoundedPageSheet(
             .clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
             .background(CoastalTokens.canvas),
     ) {
-        content()
+            content()
     }
 }
 
@@ -1073,22 +1115,6 @@ private fun TripMenuLabel(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                trip.destination?.takeIf { it.isNotBlank() }?.let { dest ->
-                    Icon(
-                        Icons.Outlined.Place,
-                        contentDescription = null,
-                        tint = CoastalTokens.muted,
-                        modifier = Modifier.size(11.dp),
-                    )
-                    Text(
-                        dest,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = CoastalTokens.muted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                }
                 Text(
                     text = badge,
                     style = MaterialTheme.typography.labelSmall,

@@ -214,7 +214,7 @@ class SyncEngine(
             id = remoteId,
             ownerId = ownerId,
             name = trip.name,
-            destination = trip.destination,
+            destination = null,
             plannedBudgetPaise = trip.plannedBudgetPaise,
             startDateEpochDay = trip.startDateEpochDay,
             endDateEpochDay = trip.endDateEpochDay,
@@ -382,7 +382,7 @@ class SyncEngine(
             val entity = TripEntity(
                 id = existing?.id ?: 0,
                 name = remote.name,
-                destination = remote.destination,
+                destination = null,
                 plannedBudgetPaise = remote.plannedBudgetPaise,
                 startDateEpochDay = remote.startDateEpochDay,
                 endDateEpochDay = remote.endDateEpochDay,

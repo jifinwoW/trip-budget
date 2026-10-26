@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tripbudget.app.cloud.AuthRepository
 import com.tripbudget.app.cloud.AuthUser
 import com.tripbudget.app.cloud.SyncEngine
+import com.tripbudget.app.cloud.friendlyCloudError
 import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.Money
@@ -100,7 +101,6 @@ class TripSelectionViewModel(
 
     fun createTrip(
         name: String,
-        destination: String?,
         budgetRupees: String,
         startDate: LocalDate,
         endDate: LocalDate,
@@ -124,7 +124,6 @@ class TripSelectionViewModel(
             val id = repository.insertTrip(
                 TripEntity(
                     name = trimmedName,
-                    destination = destination?.trim()?.takeIf { it.isNotEmpty() },
                     plannedBudgetPaise = paise,
                     startDateEpochDay = startDate.toEpochDay(),
                     endDateEpochDay = endDate.toEpochDay(),
@@ -139,7 +138,6 @@ class TripSelectionViewModel(
     fun updateTrip(
         trip: TripEntity,
         name: String,
-        destination: String?,
         budgetRupees: String,
         startDate: LocalDate,
         endDate: LocalDate,
@@ -163,7 +161,7 @@ class TripSelectionViewModel(
             repository.updateTrip(
                 trip.copy(
                     name = trimmedName,
-                    destination = destination?.trim()?.takeIf { it.isNotEmpty() },
+                    destination = null,
                     plannedBudgetPaise = paise,
                     startDateEpochDay = startDate.toEpochDay(),
                     endDateEpochDay = endDate.toEpochDay(),
@@ -199,8 +197,10 @@ class TripSelectionViewModel(
             val session = authRepository.ensureSessionForJoin()
             if (session.isFailure) {
                 onResult(
-                    session.exceptionOrNull()?.message
-                        ?: "Could not start join. Enable Anonymous sign-in in Supabase Auth.",
+                    friendlyCloudError(
+                        session.exceptionOrNull() ?: IllegalStateException("Join failed"),
+                        "Couldn't start the join. Try again.",
+                    ),
                 )
                 return@launch
             }
@@ -208,7 +208,9 @@ class TripSelectionViewModel(
             result.fold(
                 onSuccess = { onResult(null) },
                 onFailure = { err ->
-                    onResult(err.message ?: "Could not join trip")
+                    onResult(
+                        friendlyCloudError(err, "Couldn't join that trip. Check the code and try again."),
+                    )
                 },
             )
         }

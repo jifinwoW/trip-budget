@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tripbudget.app.cloud.AuthRepository
 import com.tripbudget.app.cloud.AuthUser
+import com.tripbudget.app.cloud.friendlyAuthError
+import com.tripbudget.app.cloud.friendlyCloudError
 import com.tripbudget.app.cloud.SyncEngine
 import com.tripbudget.app.data.SyncPreferences
 import com.tripbudget.app.data.HeaderWeatherPreference
@@ -96,7 +98,7 @@ class SettingsViewModel(
                         onSuccess = {
                             "Account created. If email confirmation is on, check your inbox; otherwise sign in."
                         },
-                        onFailure = { err -> err.message ?: "Sign up failed" },
+                        onFailure = { err -> friendlyAuthError(err, signingUp = true) },
                     ),
                 )
             }
@@ -122,7 +124,7 @@ class SettingsViewModel(
                     passwordInput = if (result.isSuccess) "" else it.passwordInput,
                     message = result.fold(
                         onSuccess = { "Signed in" },
-                        onFailure = { err -> err.message ?: "Sign in failed" },
+                        onFailure = { err -> friendlyAuthError(err, signingUp = false) },
                     ),
                 )
             }
@@ -147,7 +149,7 @@ class SettingsViewModel(
                     busy = false,
                     message = result.fold(
                         onSuccess = { null },
-                        onFailure = { err -> err.message ?: "Sign out failed" },
+                        onFailure = { err -> friendlyCloudError(err, "Couldn't sign out. Try again.") },
                     ),
                 )
             }
@@ -163,7 +165,9 @@ class SettingsViewModel(
                 busy = false,
                 message = result.fold(
                     onSuccess = { "Signed in — live and online" },
-                    onFailure = { err -> "Signed in, but refresh failed: ${err.message}" },
+                    onFailure = {
+                        "Signed in, but the latest trips couldn’t be loaded. Pull down to refresh."
+                    },
                 ),
             )
         }

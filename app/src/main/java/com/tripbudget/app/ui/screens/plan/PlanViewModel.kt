@@ -3,6 +3,7 @@ package com.tripbudget.app.ui.screens.plan
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tripbudget.app.cloud.friendlyCloudError
 import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.RouteStopEntity
 import com.tripbudget.app.data.entity.TripEntity
@@ -93,7 +94,10 @@ class PlanViewModel(
                     .onSuccess { placeResults.value = it }
                     .onFailure { err ->
                         placeResults.value = emptyList()
-                        placeError.value = err.message ?: "Search failed"
+                        placeError.value = friendlyCloudError(
+                            err,
+                            "Couldn't search places. Check your connection.",
+                        )
                     }
                 placeSearching.value = false
             }

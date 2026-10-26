@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tripbudget.app.cloud.friendlyCloudError
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
 
@@ -58,7 +59,7 @@ fun ShareTripDialog(
             loading = false
             result.fold(
                 onSuccess = { code = it },
-                onFailure = { error = it.message ?: "Could not create code" },
+                onFailure = { error = friendlyCloudError(it, "Couldn't create a share code. Try again.") },
             )
         }
     }

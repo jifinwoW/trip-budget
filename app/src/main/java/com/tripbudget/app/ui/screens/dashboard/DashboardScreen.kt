@@ -25,7 +25,6 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PendingActions
-import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.TrendingDown
@@ -85,8 +84,10 @@ fun DashboardScreen(
     viewModel: DashboardViewModel,
     headerWeatherKind: WeatherKind? = null,
     weatherUnderHero: Dp = 36.dp,
+    heroCorner: Dp = 24.dp,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    onPullProgress: (Float, Boolean) -> Unit = { _, _ -> },
     onEditTrip: () -> Unit = {},
     onViewAllExpenses: () -> Unit = {},
     onOpenRoutePlan: () -> Unit = {},
@@ -145,7 +146,6 @@ fun DashboardScreen(
     // because the top of this screen stays transparent for [weatherUnderHero].
     val heroHeight = 210.dp
     val heroOverlap = 24.dp
-    val heroCorner = 24.dp
     val scrollState = rememberScrollState()
     val density = LocalDensity.current
     val chipStayInteractivePx = with(density) { 40.dp.roundToPx() }
@@ -168,6 +168,7 @@ fun DashboardScreen(
     LivePullRefresh(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
+        onPullProgress = onPullProgress,
         modifier = Modifier.fillMaxSize(),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -178,21 +179,18 @@ fun DashboardScreen(
                     .padding(top = weatherUnderHero.coerceAtMost(heroCorner + 8.dp))
                     .background(CoastalTokens.canvas),
             )
-            EnterCascade(0) {
-                TripScenicHeader(
-                    tripName = trip.name,
-                    destination = trip.destination,
-                    dateRange = TripDates.formatRange(trip),
-                    plannedBudgetPaise = totals.plannedBudgetPaise,
-                    onEditBudget = onEditTrip,
-                    showBudgetChip = false,
-                    imageZoom = heroImageZoom,
-                    imageOffsetY = heroImageOffsetY,
-                    height = heroHeight,
-                    topCornerRadius = heroCorner,
-                    modifier = Modifier.align(Alignment.TopCenter),
-                )
-            }
+            TripScenicHeader(
+                tripName = trip.name,
+                dateRange = TripDates.formatRange(trip),
+                plannedBudgetPaise = totals.plannedBudgetPaise,
+                onEditBudget = onEditTrip,
+                showBudgetChip = false,
+                imageZoom = heroImageZoom,
+                imageOffsetY = heroImageOffsetY,
+                height = heroHeight,
+                topCornerRadius = heroCorner,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
 
             Column(
                 modifier = Modifier
@@ -534,13 +532,12 @@ fun DashboardScreen(
 
 /**
  * Showcase hero: full-width landscape, title top-left,
- * destination row, planned-budget chip bottom-right.
+ * date row, planned-budget chip bottom-right.
  * Top corners rounded only.
  */
 @Composable
 private fun TripScenicHeader(
     tripName: String,
-    destination: String?,
     dateRange: String?,
     plannedBudgetPaise: Long,
     onEditBudget: () -> Unit,
@@ -594,23 +591,6 @@ private fun TripScenicHeader(
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
             )
-            Spacer(Modifier.height(6.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Icon(
-                    Icons.Outlined.Place,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.92f),
-                    modifier = Modifier.size(14.dp),
-                )
-                Text(
-                    text = destination?.takeIf { it.isNotBlank() } ?: "Add a destination",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White.copy(alpha = 0.92f),
-                )
-            }
             if (dateRange != null) {
                 Spacer(Modifier.height(4.dp))
                 Row(
