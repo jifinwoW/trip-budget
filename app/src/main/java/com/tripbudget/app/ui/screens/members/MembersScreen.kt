@@ -71,6 +71,7 @@ fun MembersScreen(
     viewModel: MembersViewModel,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    onPullProgress: (fraction: Float, tracking: Boolean) -> Unit = { _, _ -> },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddMember by remember { mutableStateOf(false) }
@@ -114,6 +115,7 @@ fun MembersScreen(
         LivePullRefresh(
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
+            onPullProgress = onPullProgress,
             modifier = Modifier.padding(padding),
         ) {
         if (state.balances.isEmpty()) {
@@ -131,7 +133,7 @@ fun MembersScreen(
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
-                        top = 8.dp,
+                        top = 22.dp,
                         bottom = floatingNavContentPadding(),
                     ),
                     verticalArrangement = Arrangement.spacedBy(14.dp),

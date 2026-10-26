@@ -6,6 +6,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -80,6 +81,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -136,6 +138,11 @@ private val HeaderWeatherUnderHero = 43.dp
 
 /** Keep in sync with [navSlideTransition] duration. */
 private const val NavSlideDurationMs = 340
+
+/** Top corners of a settled tab sheet. Straight while the sheet is still rising. */
+private val PageSheetCorner = 24.dp
+
+private const val SectionRiseMs = 280
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -370,10 +377,31 @@ fun TripBudgetNavHost(
             // Incoming page sits under the full header during the slide, then tucks up
             // to the hero line once the page has arrived.
             var settledPage by remember { mutableIntStateOf(currentPage) }
+            var pullFraction by remember { mutableFloatStateOf(0f) }
+            // Opening the app refreshes on its own and drives the pull indicator to 1.
+            // Keep the sheet still until that indicator is hidden again.
+            var ignorePullUntilHidden by remember { mutableStateOf(isRefreshing) }
             LaunchedEffect(currentPage) {
+                pullFraction = 0f
                 if (settledPage == currentPage) return@LaunchedEffect
                 delay(NavSlideDurationMs.toLong())
                 settledPage = currentPage
+            }
+            LaunchedEffect(isRefreshing, pullFraction) {
+                if (isRefreshing) {
+                    ignorePullUntilHidden = true
+                } else if (pullFraction <= 0f) {
+                    ignorePullUntilHidden = false
+                }
+            }
+            val pullActive = !isRefreshing && !ignorePullUntilHidden
+            val pullVisual by animateFloatAsState(
+                targetValue = if (pullActive) pullFraction.coerceIn(0f, 1f) else 0f,
+                animationSpec = if (pullActive) snap() else tween(SectionRiseMs, easing = FastOutSlowInEasing),
+                label = "pull_sheet",
+            )
+            val onPullProgress: (Float, Boolean) -> Unit = { fraction, _ ->
+                pullFraction = fraction
             }
             Box(modifier = Modifier.fillMaxSize()) {
             // Weather sky behind toolbar; Crossfade for Header weather changes in Settings.
@@ -501,11 +529,22 @@ fun TripBudgetNavHost(
                         },
                         label = "main_nav_slide",
                     ) { page ->
-                        val sectionTop by animateDpAsState(
-                            targetValue = if (page == settledPage) 0.dp else HeaderWeatherUnderHero,
-                            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                        val sectionSettled = page == settledPage
+                        val sectionMotion = tween<Dp>(durationMillis = SectionRiseMs, easing = FastOutSlowInEasing)
+                        val riseTop by animateDpAsState(
+                            targetValue = if (sectionSettled) 0.dp else HeaderWeatherUnderHero,
+                            animationSpec = sectionMotion,
                             label = "section_slide_up",
                         )
+                        val riseCorner by animateDpAsState(
+                            targetValue = if (sectionSettled) PageSheetCorner else 0.dp,
+                            animationSpec = sectionMotion,
+                            label = "section_corner",
+                        )
+                        val pull = if (page == currentPage) pullVisual.coerceIn(0f, 1f) else 0f
+                        // Stop at the bottom of the header weather, not further down the page.
+                        val sectionTop = riseTop + HeaderWeatherUnderHero * pull
+                        val sectionCorner = riseCorner * (1f - pull)
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -528,45 +567,36 @@ fun TripBudgetNavHost(
                                 )
                             }
                             AppDestination.EXPENSES -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(CoastalTokens.canvas),
-                                ) {
+                                RoundedPageSheet(cornerRadius = sectionCorner) {
                                     ExpensesScreen(
                                         tripId = selectedTrip.id,
                                         viewModel = expensesVm,
                                         isRefreshing = isRefreshing,
                                         onRefresh = { refreshCloudAndWeather() },
+                                        onPullProgress = onPullProgress,
                                     )
                                 }
                             }
                             AppDestination.MEMBERS -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(CoastalTokens.canvas),
-                                ) {
+                                RoundedPageSheet(cornerRadius = sectionCorner) {
                                     MembersScreen(
                                         tripId = selectedTrip.id,
                                         viewModel = membersVm,
                                         isRefreshing = isRefreshing,
                                         onRefresh = { refreshCloudAndWeather() },
+                                        onPullProgress = onPullProgress,
                                     )
                                 }
                             }
                             AppDestination.SETTINGS -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(CoastalTokens.canvas),
-                                ) {
+                                RoundedPageSheet(cornerRadius = sectionCorner) {
                                     SettingsScreen(
                                         viewModel = settingsVm,
                                         liveWeather = liveWeather,
                                         hasLocationPermission = hasLocationPermission,
                                         isRefreshing = isRefreshing,
                                         onRefresh = { refreshCloudAndWeather() },
+                                        onPullProgress = onPullProgress,
                                     )
                                 }
                             }
@@ -957,6 +987,22 @@ private fun TripMenuActionRow(
         },
         onClick = onClick,
     )
+}
+
+/** Tab body under the header. Top corners ease from straight to rounded as it rises. */
+@Composable
+private fun RoundedPageSheet(
+    cornerRadius: Dp,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
+            .background(CoastalTokens.canvas),
+    ) {
+        content()
+    }
 }
 
 /** Navigation-style horizontal slide (enter full width, exit ~1/3). */

@@ -69,6 +69,7 @@ fun SettingsScreen(
     hasLocationPermission: Boolean = false,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    onPullProgress: (fraction: Float, tracking: Boolean) -> Unit = { _, _ -> },
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val headerWeather by viewModel.headerWeather.collectAsStateWithLifecycle()
@@ -86,13 +87,14 @@ fun SettingsScreen(
     LivePullRefresh(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
+        onPullProgress = onPullProgress,
     ) {
     SoftScreenCanvas {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 12.dp),
         ) {
             EnterCascade(0) {
                 Text(
