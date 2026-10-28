@@ -28,8 +28,6 @@ data class AppUpdateUiState(
     val versionName: String = BuildConfig.VERSION_NAME,
     val availableName: String? = null,
     val apkUrl: String? = null,
-    val busy: Boolean = false,
-    val progress: Float? = null,
     val message: String? = null,
 )
 
@@ -78,7 +76,6 @@ class SettingsViewModel(
     }
 
     fun refreshAppUpdate() {
-        if (_update.value.busy) return
         viewModelScope.launch {
             val release = runCatching {
                 AppUpdater.newerRelease(BuildConfig.VERSION_CODE)
@@ -93,39 +90,12 @@ class SettingsViewModel(
         }
     }
 
-    fun installUpdate() {
+    fun openUpdate() {
         val apkUrl = _update.value.apkUrl
-        if (_update.value.availableName == null || apkUrl.isNullOrBlank() || _update.value.busy) return
-        if (!AppUpdater.canRequestInstall(appContext)) {
-            AppUpdater.openInstallSettings(appContext)
-            _update.update {
-                it.copy(message = "Allow Chilavu to install updates, then tap Update again.")
-            }
-            return
-        }
-        viewModelScope.launch {
-            _update.update { it.copy(busy = true, progress = null, message = null) }
-            val downloaded = runCatching {
-                AppUpdater.download(appContext, apkUrl) { fraction ->
-                    _update.update { it.copy(progress = fraction) }
-                }
-            }
-            downloaded.fold(
-                onSuccess = { apk ->
-                    _update.update { it.copy(busy = false, progress = null) }
-                    runCatching { AppUpdater.openInstaller(appContext, apk) }
-                        .onFailure {
-                            _update.update { state ->
-                                state.copy(message = "Couldn't open the installer. Try again.")
-                            }
-                        }
-                },
-                onFailure = {
-                    _update.update { state ->
-                        state.copy(busy = false, progress = null, message = "Couldn't download the update. Try again.")
-                    }
-                },
-            )
+        if (_update.value.availableName == null || apkUrl.isNullOrBlank()) return
+        val opened = runCatching { AppUpdater.openRelease(appContext, apkUrl) }
+        _update.update {
+            it.copy(message = if (opened.isSuccess) null else "Couldn't open the update page.")
         }
     }
 

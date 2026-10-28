@@ -89,10 +89,11 @@ async function alertsFor(
 
   if (table === "trip_access" && op === "INSERT" && text(record.role) !== "owner") {
     const joined = text(record.user_id);
+    const who = text(record.display_name);
     const owners = await memberIds(supabase, tripId, "owner");
     return [{
       title: "Friend joined",
-      body: tripName,
+      body: who ? `${who} · ${tripName}` : tripName,
       tag: `join:${tripId}:${joined}`,
       userIds: owners.filter((id) => id !== joined),
     }];

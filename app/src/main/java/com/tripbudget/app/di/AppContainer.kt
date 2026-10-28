@@ -3,6 +3,7 @@ package com.tripbudget.app.di
 import android.content.Context
 import com.tripbudget.app.TripBudgetApp
 import com.tripbudget.app.cloud.AuthRepository
+import com.tripbudget.app.cloud.GuestSessionStore
 import com.tripbudget.app.cloud.SupabaseProvider
 import com.tripbudget.app.cloud.SyncEngine
 import com.tripbudget.app.data.SyncPreferences
@@ -21,7 +22,10 @@ class AppContainer(context: Context) {
 
     private val supabase = SupabaseProvider.client
 
-    val authRepository = AuthRepository(supabase?.auth)
+    val authRepository = AuthRepository(
+        supabase?.auth,
+        GuestSessionStore(context.applicationContext),
+    )
 
     val syncEngine = SyncEngine(
         appContext = context.applicationContext,

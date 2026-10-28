@@ -5,6 +5,7 @@
 3. Then run [`schema_sharing.sql`](schema_sharing.sql) (invite codes + shared access).
    If you already ran sharing and see RLS errors on trip create, also run
    [`schema_sharing_fix_rls.sql`](schema_sharing_fix_rls.sql).
+   Run [`schema_join_names.sql`](schema_join_names.sql) so joiners can enter a name and the share sheet can list them.
 4. Run [`schema_route_stops.sql`](schema_route_stops.sql) for the Plan tab (route stops + tracking).
 5. Run [`schema_realtime.sql`](schema_realtime.sql) so the app receives live updates.
    (If a table is already in the publication, that line errors — skip it.)
@@ -23,7 +24,7 @@ SUPABASE_ANON_KEY=your_anon_public_key
 Never put the `service_role` key in the Android app.
 
 10. Push alerts while the app is closed. See [Push when Chilavu is closed](#push-when-chilavu-is-closed).
-11. Run [`schema_app_release.sql`](schema_app_release.sql) so Settings can offer an in-app update. See [Updates without the Play Store](#updates-without-the-play-store).
+11. Run [`schema_app_release.sql`](schema_app_release.sql) so Settings can open the GitHub release when a newer version is published. See [Updates without the Play Store](#updates-without-the-play-store).
 12. Rebuild the app.
    - Sign in (or join with a code) — data stays **live online**.
    - Edits upload immediately; Realtime + swipe-down refresh pull others’ changes.

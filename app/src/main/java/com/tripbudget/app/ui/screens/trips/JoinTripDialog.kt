@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
@@ -30,10 +29,13 @@ import com.tripbudget.app.ui.components.PrimaryCoastalButton
 @Composable
 fun JoinTripDialog(
     onDismiss: () -> Unit,
-    onJoin: (code: String, onResult: (String?) -> Unit) -> Unit,
+    onJoin: (code: String, name: String, onResult: (String?) -> Unit) -> Unit,
 ) {
+    var name by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var codeError by remember { mutableStateOf<String?>(null) }
+    var formError by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -52,37 +54,67 @@ fun JoinTripDialog(
         ) {
             Text("Join trip", style = MaterialTheme.typography.headlineMedium)
             Text(
-                "Enter the invite code from your friend.",
+                "Enter your name and the invite code from your friend.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = name,
+                onValueChange = {
+                    name = it.take(40)
+                    nameError = null
+                },
+                label = { Text("Your name") },
+                singleLine = true,
+                isError = nameError != null,
+                supportingText = nameError?.let { message -> { Text(message) } },
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = code,
                 onValueChange = {
                     code = it.uppercase().filter { ch -> ch.isLetterOrDigit() }.take(8)
-                    error = null
+                    codeError = null
                 },
                 label = { Text("Invite code") },
                 singleLine = true,
-                isError = error != null,
-                supportingText = error?.let { { Text(it) } },
+                isError = codeError != null,
+                supportingText = codeError?.let { message -> { Text(message) } },
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
                 ),
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (formError != null) {
+                Text(
+                    formError!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             PrimaryCoastalButton(
                 text = if (busy) "Joining…" else "Join trip",
                 onClick = {
-                    if (code.length < 4) {
-                        error = "Enter a valid code"
-                        return@PrimaryCoastalButton
-                    }
+                    val missingName = name.isBlank()
+                    val missingCode = code.length < 4
+                    nameError = if (missingName) "Enter your name" else null
+                    codeError = if (missingCode) "Enter a valid code" else null
+                    formError = null
+                    if (missingName || missingCode) return@PrimaryCoastalButton
                     busy = true
-                    onJoin(code) { result ->
+                    onJoin(code, name.trim()) { result ->
                         busy = false
-                        if (result == null) onDismiss() else error = result
+                        if (result == null) {
+                            onDismiss()
+                            return@onJoin
+                        }
+                        when {
+                            result.contains("name", ignoreCase = true) -> nameError = result
+                            result.contains("code", ignoreCase = true) -> codeError = result
+                            else -> formError = result
+                        }
                     }
                 },
                 enabled = !busy,

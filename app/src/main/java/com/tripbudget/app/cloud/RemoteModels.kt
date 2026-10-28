@@ -42,6 +42,17 @@ data class RemoteRouteStop(
 @Serializable
 data class JoinTripParams(
     @SerialName("p_code") val code: String,
+    @SerialName("p_name") val name: String,
+)
+
+@Serializable
+data class TripIdParams(
+    @SerialName("p_trip_id") val tripId: String,
+)
+
+@Serializable
+data class JoinerNameRow(
+    @SerialName("display_name") val displayName: String,
 )
 
 @Serializable

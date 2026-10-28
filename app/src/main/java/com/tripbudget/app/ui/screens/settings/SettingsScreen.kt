@@ -200,7 +200,7 @@ fun SettingsScreen(
                 AboutSection(
                     hasAccount = !cloud.user?.email.isNullOrBlank(),
                     update = update,
-                    onUpdate = viewModel::installUpdate,
+                    onUpdate = viewModel::openUpdate,
                 )
             }
 
@@ -481,64 +481,29 @@ private fun AboutSection(
         }
 
         if (update.availableName != null) {
-            val percent = update.progress?.let { (it * 100).toInt().coerceIn(0, 100) }
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(CoastalTokens.tealSoft)
-                    .clickable(enabled = !update.busy, onClick = onUpdate)
+                    .clickable(onClick = onUpdate)
                     .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    if (update.busy && percent == null) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = CoastalTokens.tealSoftFg,
-                        )
-                        Spacer(Modifier.size(10.dp))
-                    } else if (!update.busy) {
-                        Icon(
-                            Icons.Outlined.SystemUpdate,
-                            contentDescription = null,
-                            tint = CoastalTokens.tealSoftFg,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.size(8.dp))
-                    }
-                    Text(
-                        when {
-                            percent != null -> "Downloading $percent%"
-                            update.busy -> "Downloading…"
-                            else -> "Update to ${update.availableName}"
-                        },
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = CoastalTokens.tealSoftFg,
-                    )
-                }
-                if (percent != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(99.dp))
-                            .background(CoastalTokens.tealSoftFg.copy(alpha = 0.28f)),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(update.progress ?: 0f)
-                                .height(6.dp)
-                                .background(CoastalTokens.tealSoftFg),
-                        )
-                    }
-                }
+                Icon(
+                    Icons.Outlined.SystemUpdate,
+                    contentDescription = null,
+                    tint = CoastalTokens.tealSoftFg,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    "Update to ${update.availableName}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CoastalTokens.tealSoftFg,
+                )
             }
         }
 

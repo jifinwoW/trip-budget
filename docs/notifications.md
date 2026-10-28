@@ -28,7 +28,7 @@ Alerts show while Chilavu is closed, as long as the phone has opened the app onc
 | --- | --- |
 | **When** | A signed-in person joins a trip. Joining again with the same account does not send another alert. Creating the trip does not count. |
 | **Title** | Friend joined |
-| **Body** | The trip name. The person’s name and email are not included. |
+| **Body** | The name they entered, then the trip name. |
 | **Who** | The owner. The person who joined does not get it. |
 | **On screen** | Yes. |
 

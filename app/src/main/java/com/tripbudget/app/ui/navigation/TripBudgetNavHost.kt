@@ -77,10 +77,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -370,7 +376,7 @@ fun TripBudgetNavHost(
             if (showJoinTrip) {
                 JoinTripDialog(
                     onDismiss = { showJoinTrip = false },
-                    onJoin = { code, onResult -> tripSelectionVm.joinTrip(code, onResult) },
+                    onJoin = { code, name, onResult -> tripSelectionVm.joinTrip(code, name, onResult) },
                 )
             }
             if (showSignIn) {
@@ -403,7 +409,7 @@ fun TripBudgetNavHost(
             if (showJoinTrip) {
                 JoinTripDialog(
                     onDismiss = { showJoinTrip = false },
-                    onJoin = { code, onResult -> tripSelectionVm.joinTrip(code, onResult) },
+                    onJoin = { code, name, onResult -> tripSelectionVm.joinTrip(code, name, onResult) },
                 )
             }
             if (showAuthForCreate) {
@@ -853,13 +859,16 @@ fun TripBudgetNavHost(
                     onPrepareCode = { trip, onResult ->
                         tripSelectionVm.prepareShareCode(trip, onResult)
                     },
+                    onLoadJoiners = { trip, onResult ->
+                        tripSelectionVm.loadJoinerNames(trip, onResult)
+                    },
                     onDismiss = { showShareTrip = false },
                 )
             }
             if (showJoinTrip) {
                 JoinTripDialog(
                     onDismiss = { showJoinTrip = false },
-                    onJoin = { code, onResult -> tripSelectionVm.joinTrip(code, onResult) },
+                    onJoin = { code, name, onResult -> tripSelectionVm.joinTrip(code, name, onResult) },
                 )
             }
             }
@@ -1123,10 +1132,37 @@ private fun RoundedPageSheet(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
+            .roundedTopClip(cornerRadius)
             .background(CoastalTokens.canvas),
     ) {
             content()
+    }
+}
+
+/**
+ * Android 12 blanks a page when a rounded outline clip changes. Draw the curve
+ * with a canvas path there. Other versions keep the normal clip.
+ */
+private fun Modifier.roundedTopClip(cornerRadius: Dp): Modifier {
+    if (Build.VERSION.SDK_INT !in 31..32) {
+        return clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
+    }
+    return drawWithContent {
+        val radius = cornerRadius.toPx()
+        if (radius <= 0f) {
+            drawContent()
+            return@drawWithContent
+        }
+        val path = Path().apply {
+            addRoundRect(
+                RoundRect(
+                    rect = Rect(0f, 0f, size.width, size.height),
+                    topLeft = CornerRadius(radius),
+                    topRight = CornerRadius(radius),
+                ),
+            )
+        }
+        clipPath(path) { this@drawWithContent.drawContent() }
     }
 }
 
@@ -1134,25 +1170,21 @@ private fun RoundedPageSheet(
 private fun navSlideTransition(forward: Boolean): ContentTransform {
     val duration = NavSlideDurationMs
     val easing = FastOutSlowInEasing
-    return if (forward) {
-        slideInHorizontally(
-            animationSpec = tween(duration, easing = easing),
-            initialOffsetX = { fullWidth -> fullWidth },
-        ) + fadeIn(animationSpec = tween(duration / 2, easing = easing)) togetherWith
-            slideOutHorizontally(
-                animationSpec = tween(duration, easing = easing),
-                targetOffsetX = { fullWidth -> -fullWidth / 3 },
-            ) + fadeOut(animationSpec = tween(duration / 2, easing = easing))
-    } else {
-        slideInHorizontally(
-            animationSpec = tween(duration, easing = easing),
-            initialOffsetX = { fullWidth -> -fullWidth },
-        ) + fadeIn(animationSpec = tween(duration / 2, easing = easing)) togetherWith
-            slideOutHorizontally(
-                animationSpec = tween(duration, easing = easing),
-                targetOffsetX = { fullWidth -> fullWidth / 3 },
-            ) + fadeOut(animationSpec = tween(duration / 2, easing = easing))
+    // Android 12 leaves the page blank after a fade returns to full opacity.
+    val fade = Build.VERSION.SDK_INT !in 31..32
+    val enter = slideInHorizontally(
+        animationSpec = tween(duration, easing = easing),
+        initialOffsetX = { fullWidth -> if (forward) fullWidth else -fullWidth },
+    ).let { slide ->
+        if (fade) slide + fadeIn(animationSpec = tween(duration / 2, easing = easing)) else slide
     }
+    val exit = slideOutHorizontally(
+        animationSpec = tween(duration, easing = easing),
+        targetOffsetX = { fullWidth -> if (forward) -fullWidth / 3 else fullWidth / 3 },
+    ).let { slide ->
+        if (fade) slide + fadeOut(animationSpec = tween(duration / 2, easing = easing)) else slide
+    }
+    return enter togetherWith exit
 }
 
 @Composable

@@ -19,6 +19,7 @@ data class AuthUser(
 
 class AuthRepository(
     private val auth: Auth?,
+    private val guestSessions: GuestSessionStore,
 ) {
     val isConfigured: Boolean = auth != null
 
@@ -68,11 +69,36 @@ class AuthRepository(
         val client = auth
             ?: error("Supabase is not configured.")
         client.signInAnonymously()
+        rememberGuest()
     }
 
     /** Ensures a session exists for join-by-code (anonymous if needed). */
     suspend fun ensureSessionForJoin(): Result<Unit> {
-        if (currentUserIdOrNull() != null) return Result.success(Unit)
+        val client = auth ?: return Result.failure(IllegalStateException("Supabase is not configured."))
+        if (client.currentUserOrNull() != null) {
+            if (accountStillExists(client)) {
+                rememberGuest()
+                return Result.success(Unit)
+            }
+            dropMissingGuest(client)
+        } else if (!restoreSavedGuest(client)) {
+            dropMissingGuest(client)
+        } else {
+            return Result.success(Unit)
+        }
+        return signInAnonymously()
+    }
+
+    /**
+     * The access token can still look signed-in after the guest row was removed.
+     * Join then fails the user foreign key. Drop that session so the next sign-in is a real account.
+     */
+    suspend fun replaceMissingGuest(): Result<Unit> {
+        val client = auth ?: return Result.failure(IllegalStateException("Supabase is not configured."))
+        if (!client.currentUserOrNull()?.email.isNullOrBlank()) {
+            return Result.failure(IllegalStateException("Sign in again to join a trip."))
+        }
+        dropMissingGuest(client)
         return signInAnonymously()
     }
 
@@ -94,7 +120,54 @@ class AuthRepository(
 
     suspend fun signOut(): Result<Unit> = runCatching {
         val client = auth ?: return@runCatching
-        client.signOut()
+        val session = client.currentSessionOrNull()
+        if (session != null && client.currentUserOrNull()?.email.isNullOrBlank()) {
+            // Keep the refresh token. A server sign-out would force a new guest next time.
+            guestSessions.remember(session)
+            client.clearSession()
+        } else {
+            client.signOut()
+        }
+    }
+
+    private suspend fun restoreSavedGuest(client: Auth): Boolean {
+        val saved = guestSessions.savedSession() ?: return false
+        val restored = runCatching { client.importSession(saved) }
+        if (restored.isFailure || client.currentUserOrNull() == null || !accountStillExists(client)) {
+            return false
+        }
+        rememberGuest()
+        return true
+    }
+
+    private suspend fun accountStillExists(client: Auth): Boolean {
+        if (!client.currentUserOrNull()?.email.isNullOrBlank()) return true
+        val check = runCatching { client.retrieveUserForCurrentSession(updateSession = false) }
+        if (check.isSuccess) return true
+        val authError = generateSequence(check.exceptionOrNull()) { it.cause }
+            .filterIsInstance<AuthRestException>()
+            .firstOrNull()
+            ?: return true
+        return when (authError.errorCode) {
+            AuthErrorCode.UserNotFound,
+            AuthErrorCode.SessionNotFound,
+            AuthErrorCode.UserBanned,
+            -> false
+            else -> authError.statusCode != 404 &&
+                !authError.error.contains("user_not_found", ignoreCase = true)
+        }
+    }
+
+    private suspend fun dropMissingGuest(client: Auth) {
+        guestSessions.clear()
+        runCatching { client.clearSession() }
+    }
+
+    private fun rememberGuest() {
+        val client = auth ?: return
+        val session = client.currentSessionOrNull() ?: return
+        if (!client.currentUserOrNull()?.email.isNullOrBlank()) return
+        guestSessions.remember(session)
     }
 
     private fun UserInfo.toAuthUser(): AuthUser =

@@ -21,6 +21,7 @@ create table if not exists public.trip_access (
     trip_id uuid not null references public.trips (id) on delete cascade,
     user_id uuid not null references auth.users (id) on delete cascade,
     role text not null check (role in ('owner', 'editor')),
+    display_name text,
     joined_at timestamptz not null default now(),
     primary key (trip_id, user_id)
 );
@@ -109,7 +110,7 @@ $$;
 -- Join by invite code
 -- ---------------------------------------------------------------------------
 
-create or replace function public.join_trip_by_code(p_code text)
+create or replace function public.join_trip_by_code(p_code text, p_name text)
 returns uuid
 language plpgsql
 security definer
@@ -118,12 +119,19 @@ as $$
 declare
     v_trip_id uuid;
     v_code text := upper(trim(p_code));
+    v_name text := trim(p_name);
 begin
     if auth.uid() is null then
         raise exception 'Not signed in';
     end if;
     if v_code is null or length(v_code) < 4 then
         raise exception 'Enter a valid invite code';
+    end if;
+    if v_name is null or char_length(v_name) < 1 then
+        raise exception 'Enter your name';
+    end if;
+    if char_length(v_name) > 40 then
+        raise exception 'Keep your name under 40 characters';
     end if;
 
     select t.id into v_trip_id
@@ -135,16 +143,18 @@ begin
         raise exception 'Invalid invite code';
     end if;
 
-    insert into public.trip_access (trip_id, user_id, role)
-    values (v_trip_id, auth.uid(), 'editor')
-    on conflict (trip_id, user_id) do nothing;
+    insert into public.trip_access (trip_id, user_id, role, display_name)
+    values (v_trip_id, auth.uid(), 'editor', v_name)
+    on conflict (trip_id, user_id) do update
+        set display_name = excluded.display_name
+        where trip_access.role <> 'owner';
 
     return v_trip_id;
 end;
 $$;
 
-revoke all on function public.join_trip_by_code(text) from public;
-grant execute on function public.join_trip_by_code(text) to authenticated;
+revoke all on function public.join_trip_by_code(text, text) from public;
+grant execute on function public.join_trip_by_code(text, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- RLS: shared access (replace owner-only policies)

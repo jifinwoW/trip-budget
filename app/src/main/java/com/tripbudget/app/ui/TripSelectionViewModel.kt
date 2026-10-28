@@ -237,9 +237,8 @@ class TripSelectionViewModel(
         }
     }
 
-    fun joinTrip(code: String, onResult: (String?) -> Unit) {
+    fun joinTrip(code: String, name: String, onResult: (String?) -> Unit) {
         viewModelScope.launch {
-            // Join does not ask for email — use anonymous session if needed.
             val session = authRepository.ensureSessionForJoin()
             if (session.isFailure) {
                 onResult(
@@ -250,7 +249,15 @@ class TripSelectionViewModel(
                 )
                 return@launch
             }
-            val result = syncEngine.joinTripByCode(code)
+            var result = syncEngine.joinTripByCode(code, name)
+            if (result.isFailure && missingAuthUser(result.exceptionOrNull())) {
+                val replaced = authRepository.replaceMissingGuest()
+                result = if (replaced.isSuccess) {
+                    syncEngine.joinTripByCode(code, name)
+                } else {
+                    replaced
+                }
+            }
             result.fold(
                 onSuccess = { onResult(null) },
                 onFailure = { err ->
@@ -259,6 +266,20 @@ class TripSelectionViewModel(
                     )
                 },
             )
+        }
+    }
+
+    private fun missingAuthUser(error: Throwable?): Boolean {
+        val text = generateSequence(error) { it.cause }
+            .mapNotNull { it.message }
+            .joinToString(" ")
+        return text.contains("not present in table", ignoreCase = true) &&
+            text.contains("users", ignoreCase = true)
+    }
+
+    fun loadJoinerNames(trip: TripEntity, onResult: (List<String>) -> Unit) {
+        viewModelScope.launch {
+            onResult(syncEngine.joinerNames(trip.id))
         }
     }
 

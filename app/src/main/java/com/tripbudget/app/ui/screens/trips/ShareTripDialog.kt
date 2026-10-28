@@ -40,16 +40,19 @@ import com.tripbudget.app.ui.components.PrimaryCoastalButton
 fun ShareTripDialog(
     trip: TripEntity,
     onPrepareCode: (TripEntity, (Result<String>) -> Unit) -> Unit,
+    onLoadJoiners: (TripEntity, (List<String>) -> Unit) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var code by remember { mutableStateOf(trip.inviteCode.orEmpty()) }
     var loading by remember { mutableStateOf(code.isBlank()) }
     var error by remember { mutableStateOf<String?>(null) }
     var copied by remember { mutableStateOf(false) }
+    var joiners by remember { mutableStateOf<List<String>?>(null) }
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(trip.id) {
+        onLoadJoiners(trip) { joiners = it }
         if (code.isNotBlank()) {
             loading = false
             return@LaunchedEffect
@@ -84,7 +87,7 @@ fun ShareTripDialog(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "Friends sign in, tap Join trip, and enter this code.",
+                "Friends tap Join trip, enter their name, and use this code.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
@@ -121,6 +124,36 @@ fun ShareTripDialog(
                         },
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                     )
+                    Text(
+                        "Joined",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    val people = joiners
+                    if (people == null) {
+                        Text(
+                            "Loading names…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else if (people.isEmpty()) {
+                        Text(
+                            "No one yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        people.forEach { person ->
+                            Text(
+                                person,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
                 }
             }
             TextButton(onClick = onDismiss) {

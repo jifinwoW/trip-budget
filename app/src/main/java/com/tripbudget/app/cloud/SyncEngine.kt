@@ -217,19 +217,34 @@ class SyncEngine(
     }
 
     /** Friend enters invite code → gains access → full refresh pulls the trip. */
-    suspend fun joinTripByCode(code: String): Result<Unit> = runCatching {
+    suspend fun joinTripByCode(code: String, name: String): Result<Unit> = runCatching {
         val supabase = client
             ?: error("Supabase is not configured.")
         if (authRepository.currentUserIdOrNull() == null) {
             error("Sign in to join a trip.")
         }
         val trimmed = code.trim().uppercase()
+        val trimmedName = name.trim()
         if (trimmed.length < 4) error("Enter a valid invite code")
+        if (trimmedName.isEmpty()) error("Enter your name")
+        if (trimmedName.length > 40) error("Keep your name under 40 characters")
         supabase.postgrest.rpc(
             function = "join_trip_by_code",
-            parameters = JoinTripParams(code = trimmed),
+            parameters = JoinTripParams(code = trimmed, name = trimmedName),
         )
         sync().getOrThrow()
+    }
+
+    /** Names of people who joined this trip with the code. The owner is not included. */
+    suspend fun joinerNames(localTripId: Long): List<String> {
+        val supabase = client ?: return emptyList()
+        val remoteId = repository.getTrip(localTripId)?.remoteId ?: return emptyList()
+        return runCatching {
+            supabase.postgrest.rpc(
+                function = "trip_joiner_names",
+                parameters = TripIdParams(tripId = remoteId),
+            ).decodeList<JoinerNameRow>()
+        }.getOrDefault(emptyList()).map { it.displayName.trim() }.filter { it.isNotEmpty() }
     }
 
     private fun newInviteCode(): String {
@@ -847,7 +862,9 @@ class SyncEngine(
         ) {
             return null
         }
-        return "Friend joined" to tripName
+        val who = record.displayName?.trim()?.takeIf { it.isNotEmpty() }
+        val body = if (who != null) "$who · $tripName" else tripName
+        return "Friend joined" to body
     }
 
     /** Owner hears about people who joined, including joins the live event missed. */
@@ -864,7 +881,9 @@ class SyncEngine(
             val trip = repository.getTripByRemoteId(row.tripId) ?: continue
             if (!ownsTrip(trip, userId)) continue
             if (!markJoinAlerted(row.tripId, row.userId)) continue
-            showNotification("Friend joined", trip.name, true, "join:${row.tripId}:${row.userId}")
+            val who = row.displayName?.trim()?.takeIf { it.isNotEmpty() }
+            val body = if (who != null) "$who · ${trip.name}" else trip.name
+            showNotification("Friend joined", body, true, "join:${row.tripId}:${row.userId}")
         }
     }
 
@@ -1218,6 +1237,7 @@ private data class RemoteTripAccess(
     @SerialName("trip_id") val tripId: String,
     @SerialName("user_id") val userId: String,
     val role: String,
+    @SerialName("display_name") val displayName: String? = null,
 )
 
 @Serializable
@@ -1232,6 +1252,7 @@ private data class NotifyRow(
     @SerialName("trip_id") val tripId: String? = null,
     @SerialName("user_id") val userId: String? = null,
     val role: String? = null,
+    @SerialName("display_name") val displayName: String? = null,
     val name: String? = null,
     val title: String? = null,
     val body: String? = null,
