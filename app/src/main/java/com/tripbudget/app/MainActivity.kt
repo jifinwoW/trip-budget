@@ -14,9 +14,12 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tripbudget.app.location.RouteTripSchedule
+import com.tripbudget.app.notify.TripReminders
 import com.tripbudget.app.ui.navigation.TripBudgetNavHost
 import com.tripbudget.app.ui.screens.settings.SettingsViewModel
 import com.tripbudget.app.ui.theme.TripBudgetTheme
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -39,10 +42,22 @@ class MainActivity : ComponentActivity() {
         }
 
         app.container.routeArrivalTracker.start()
+        lifecycleScope.launch {
+            combine(
+                app.container.repository.observeTrips(),
+                app.container.authRepository.sessionStatus,
+            ) { _, _ ->
+                app.container.authRepository.currentUserIdOrNull()
+            }.collect { userId ->
+                RouteTripSchedule.refresh(app, app.container.repository, userId)
+                TripReminders.refresh(app, app.container.repository)
+            }
+        }
 
         setContent {
             val settingsVm: SettingsViewModel = viewModel(
                 factory = SettingsViewModel.factory(
+                    appContext = applicationContext,
                     themePreferences = app.container.themePreferences,
                     authRepository = app.container.authRepository,
                     syncEngine = app.container.syncEngine,

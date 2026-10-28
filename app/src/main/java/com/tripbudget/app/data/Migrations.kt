@@ -148,4 +148,18 @@ object Migrations {
             db.execSQL("ALTER TABLE `trips` ADD COLUMN `placeLng` REAL")
         }
     }
+
+    /** v7 → v8: optional device-local cover photo for the dashboard hero. */
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `trips` ADD COLUMN `coverImagePath` TEXT")
+        }
+    }
+
+    /** v8 → v9: cloud object key for the shared hero photo. */
+    val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `trips` ADD COLUMN `coverObjectKey` TEXT")
+        }
+    }
 }

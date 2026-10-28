@@ -7,3 +7,5 @@ alter publication supabase_realtime add table public.members;
 alter publication supabase_realtime add table public.contributions;
 alter publication supabase_realtime add table public.expenses;
 alter publication supabase_realtime add table public.route_stops;
+alter publication supabase_realtime add table public.trip_access;
+alter publication supabase_realtime add table public.trip_announcements;

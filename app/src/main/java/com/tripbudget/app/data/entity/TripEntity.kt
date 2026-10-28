@@ -30,4 +30,8 @@ data class TripEntity(
     /** When true, GPS auto-marks route stops as reached. */
     val routeTrackingActive: Boolean = false,
     val updatedAt: Long = System.currentTimeMillis(),
+    /** Cached hero photo on this phone. The shared copy lives in the uploads bucket. */
+    val coverImagePath: String? = null,
+    /** Object key already uploaded or downloaded, such as `{trip remote id}/cover.jpg`. */
+    val coverObjectKey: String? = null,
 )

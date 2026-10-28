@@ -3,4 +3,5 @@
     <color name="ic_launcher_background">#000000</color>
     <!-- Sampled from top sky of bg_splash.png for Android 12+ native splash. -->
     <color name="splash_sky">#82D9E4</color>
+    <color name="notification_teal">#0D9B8A</color>
 </resources>

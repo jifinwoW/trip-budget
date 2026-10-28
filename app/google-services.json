@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "108810869866",
+    "project_id": "trip-budget-tracker-dd5f0",
+    "storage_bucket": "trip-budget-tracker-dd5f0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:108810869866:android:39d1b933e4c03e7fdd7e13",
+        "android_client_info": {
+          "package_name": "com.tripbudget.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDNFHG6NIxdh59VN3OrIri-a23voq0tes"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

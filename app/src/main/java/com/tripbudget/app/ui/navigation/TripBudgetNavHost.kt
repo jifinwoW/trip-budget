@@ -2,7 +2,10 @@ package com.tripbudget.app.ui.navigation
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -51,6 +54,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -105,6 +109,7 @@ import com.tripbudget.app.location.RouteArrivalTracker
 import com.tripbudget.app.location.isDeviceLocationEnabled
 import com.tripbudget.app.location.promptEnableDeviceLocation
 import com.tripbudget.app.places.LatLng
+import com.tripbudget.app.notify.TripWeatherAlerts
 import com.tripbudget.app.places.OpenMeteoWeather
 import com.tripbudget.app.places.PlaceWeather
 import com.tripbudget.app.places.RainIntensity
@@ -130,6 +135,7 @@ import com.tripbudget.app.ui.screens.plan.rememberRouteLocationPermissionLaunche
 import com.tripbudget.app.ui.screens.settings.SettingsScreen
 import com.tripbudget.app.ui.screens.settings.SettingsViewModel
 import com.tripbudget.app.ui.screens.trips.JoinTripDialog
+import com.tripbudget.app.ui.screens.trips.NotifyMembersSheet
 import com.tripbudget.app.ui.screens.trips.ShareTripDialog
 import com.tripbudget.app.ui.screens.trips.TripEditorDialog
 import com.tripbudget.app.ui.theme.CoastalTokens
@@ -163,7 +169,12 @@ fun TripBudgetNavHost(
     routeArrivalTracker: RouteArrivalTracker? = null,
 ) {
     val tripSelectionVm: TripSelectionViewModel = viewModel(
-        factory = TripSelectionViewModel.factory(repository, syncEngine, authRepository),
+        factory = TripSelectionViewModel.factory(
+            LocalContext.current,
+            repository,
+            syncEngine,
+            authRepository,
+        ),
     )
     val tripIdFlow = remember(tripSelectionVm) {
         tripSelectionVm.uiState.map { it.selectedTripId }
@@ -217,29 +228,8 @@ fun TripBudgetNavHost(
             promptLocationServices()
         }
     }
-    val emptyProximity = remember {
-        kotlinx.coroutines.flow.MutableStateFlow<com.tripbudget.app.location.NextStopProximity?>(null)
-    }
-    val routeProximity by (routeArrivalTracker?.proximity ?: emptyProximity)
-        .collectAsStateWithLifecycle()
-
-
-    val settingsVm: SettingsViewModel = viewModel(
-        factory = SettingsViewModel.factory(
-            themePreferences = themePreferences,
-            authRepository = authRepository,
-            syncEngine = syncEngine,
-            syncPreferences = syncPreferences,
-            tripRepository = repository,
-        ),
-    )
-
-    val tripState by tripSelectionVm.uiState.collectAsStateWithLifecycle()
-    val authUser by tripSelectionVm.authUser.collectAsStateWithLifecycle()
-    val isRefreshing by tripSelectionVm.isRefreshing.collectAsStateWithLifecycle()
-    val authResolving by authRepository.isAuthResolving.collectAsStateWithLifecycle(initialValue = true)
-    LaunchedEffect(authResolving) {
-        if (authResolving) return@LaunchedEffect
+    var askedNotificationPermission by remember { mutableStateOf(false) }
+    fun requestLocationAccess() {
         if (!hasLocationPermission) {
             if (!askedLocationPermission) {
                 askedLocationPermission = true
@@ -254,6 +244,54 @@ fun TripBudgetNavHost(
             promptLocationServices()
         }
     }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) syncEngine.registerPushToken()
+        requestLocationAccess()
+    }
+    val emptyProximity = remember {
+        kotlinx.coroutines.flow.MutableStateFlow<com.tripbudget.app.location.NextStopProximity?>(null)
+    }
+    val routeProximity by (routeArrivalTracker?.proximity ?: emptyProximity)
+        .collectAsStateWithLifecycle()
+
+
+    val settingsVm: SettingsViewModel = viewModel(
+        factory = SettingsViewModel.factory(
+            appContext = context.applicationContext,
+            themePreferences = themePreferences,
+            authRepository = authRepository,
+            syncEngine = syncEngine,
+            syncPreferences = syncPreferences,
+            tripRepository = repository,
+        ),
+    )
+
+    val tripState by tripSelectionVm.uiState.collectAsStateWithLifecycle()
+    val authUser by tripSelectionVm.authUser.collectAsStateWithLifecycle()
+    val isRefreshing by tripSelectionVm.isRefreshing.collectAsStateWithLifecycle()
+    val authResolving by authRepository.isAuthResolving.collectAsStateWithLifecycle(initialValue = true)
+    LaunchedEffect(authResolving, authUser?.id) {
+        if (authResolving) return@LaunchedEffect
+        val notificationsAllowed = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+        val askNotifications = authUser != null &&
+            !notificationsAllowed &&
+            !askedNotificationPermission
+        if (askNotifications) {
+            askedNotificationPermission = true
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return@LaunchedEffect
+        }
+        if (authUser != null && notificationsAllowed) {
+            syncEngine.registerPushToken()
+        }
+        requestLocationAccess()
+    }
     val pages = remember { AppDestination.entries }
     var currentPage by remember { mutableIntStateOf(0) }
 
@@ -261,6 +299,7 @@ fun TripBudgetNavHost(
     var showEditTrip by remember { mutableStateOf(false) }
     var showDeleteTrip by remember { mutableStateOf(false) }
     var showShareTrip by remember { mutableStateOf(false) }
+    var showNotifyMembers by remember { mutableStateOf(false) }
     var showJoinTrip by remember { mutableStateOf(false) }
     var showAuthForCreate by remember { mutableStateOf(false) }
     var showSignIn by remember { mutableStateOf(false) }
@@ -281,6 +320,7 @@ fun TripBudgetNavHost(
             showEditTrip = false
             showDeleteTrip = false
             showShareTrip = false
+            showNotifyMembers = false
             showAuthForCreate = false
             showSignIn = false
             showJoinTrip = false
@@ -381,13 +421,14 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = null,
                     onDismiss = { showCreateTrip = false },
-                    onSave = { name, place, budget, startDate, endDate, onResult ->
+                    onSave = { name, place, budget, startDate, endDate, cover, onResult ->
                         tripSelectionVm.createTrip(
                             name,
                             place,
                             budget,
                             startDate,
                             endDate,
+                            cover,
                             onResult,
                         )
                     },
@@ -407,16 +448,32 @@ fun TripBudgetNavHost(
             val placeLat = selectedTrip.placeLat
             val placeLng = selectedTrip.placeLng
             LaunchedEffect(
+                selectedTrip.id,
                 placeLat,
                 placeLng,
                 currentPage,
                 headerWeatherPref,
                 weatherRefreshKey,
             ) {
-                liveWeather = if (placeLat != null && placeLng != null) {
+                val fetched = if (placeLat != null && placeLng != null) {
                     OpenMeteoWeather.fetchCurrent(listOf(LatLng(placeLat, placeLng))).firstOrNull()
                 } else {
                     null
+                }
+                liveWeather = fetched
+                if (
+                    headerWeatherPref == HeaderWeatherPreference.LIVE &&
+                    fetched != null &&
+                    placeLat != null
+                ) {
+                    TripWeatherAlerts.onFetched(
+                        context.applicationContext,
+                        selectedTrip.id,
+                        selectedTrip.remoteId,
+                        selectedTrip.name,
+                        fetched.kind,
+                        fetched.label,
+                    )
                 }
             }
             fun refreshCloudAndWeather() {
@@ -543,6 +600,10 @@ fun TripBudgetNavHost(
                         onShareTrip = {
                             tripMenuExpanded = false
                             showShareTrip = true
+                        },
+                        onNotifyMembers = {
+                            tripMenuExpanded = false
+                            showNotifyMembers = true
                         },
                         onEditTrip = {
                             tripMenuExpanded = false
@@ -734,13 +795,14 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = null,
                     onDismiss = { showCreateTrip = false },
-                    onSave = { name, place, budget, startDate, endDate, onResult ->
+                    onSave = { name, place, budget, startDate, endDate, cover, onResult ->
                         tripSelectionVm.createTrip(
                             name,
                             place,
                             budget,
                             startDate,
                             endDate,
+                            cover,
                             onResult,
                         )
                     },
@@ -750,7 +812,7 @@ fun TripBudgetNavHost(
                 TripEditorDialog(
                     existing = selectedTrip,
                     onDismiss = { showEditTrip = false },
-                    onSave = { name, place, budget, startDate, endDate, onResult ->
+                    onSave = { name, place, budget, startDate, endDate, cover, onResult ->
                         tripSelectionVm.updateTrip(
                             selectedTrip,
                             name,
@@ -758,6 +820,7 @@ fun TripBudgetNavHost(
                             budget,
                             startDate,
                             endDate,
+                            cover,
                             onResult,
                         )
                     },
@@ -773,6 +836,15 @@ fun TripBudgetNavHost(
                         }
                     },
                     onDismiss = { showDeleteTrip = false },
+                )
+            }
+            if (showNotifyMembers && tripState.selectedIsOwned) {
+                NotifyMembersSheet(
+                    trip = selectedTrip,
+                    onDismiss = { showNotifyMembers = false },
+                    onSend = { title, message, onResult ->
+                        tripSelectionVm.sendMemberNotification(selectedTrip, title, message, onResult)
+                    },
                 )
             }
             if (showShareTrip) {
@@ -808,6 +880,7 @@ private fun CoastalAppHeader(
     onCreateTrip: () -> Unit,
     onJoinTrip: () -> Unit,
     onShareTrip: () -> Unit,
+    onNotifyMembers: () -> Unit,
     onEditTrip: () -> Unit,
     onDeleteTrip: () -> Unit,
     canDeleteTrip: Boolean,
@@ -965,6 +1038,13 @@ private fun CoastalAppHeader(
                         label = "Share trip",
                         onClick = onShareTrip,
                     )
+                    if (canDeleteTrip) {
+                        TripMenuActionRow(
+                            icon = Icons.Default.Notifications,
+                            label = "Notify members",
+                            onClick = onNotifyMembers,
+                        )
+                    }
                     TripMenuActionRow(
                         icon = Icons.Default.Edit,
                         label = "Edit trip",

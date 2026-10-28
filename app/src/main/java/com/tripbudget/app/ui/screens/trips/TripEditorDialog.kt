@@ -1,6 +1,9 @@
 package com.tripbudget.app.ui.screens.trips
 
-import androidx.compose.foundation.Image
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,9 +44,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.tripbudget.app.R
 import com.tripbudget.app.cloud.friendlyCloudError
 import com.tripbudget.app.data.entity.TripEntity
@@ -55,8 +58,15 @@ import com.tripbudget.app.ui.components.DatePickerField
 import com.tripbudget.app.ui.components.MoneyTextField
 import com.tripbudget.app.ui.components.PrimaryCoastalButton
 import com.tripbudget.app.ui.theme.Teal600
+import java.io.File
 import java.time.LocalDate
 import kotlinx.coroutines.delay
+
+/** Photo chosen in the trip editor. [pickedUri] wins over removing the saved cover. */
+data class TripCoverSelection(
+    val pickedUri: Uri? = null,
+    val removeExisting: Boolean = false,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +79,7 @@ fun TripEditorDialog(
         budgetRupees: String,
         startDate: LocalDate,
         endDate: LocalDate,
+        cover: TripCoverSelection,
         onResult: (String?) -> Unit,
     ) -> Unit,
 ) {
@@ -108,6 +119,18 @@ fun TripEditorDialog(
             existing?.endDateEpochDay?.let { LocalDate.ofEpochDay(it) }
                 ?: LocalDate.now().plusDays(6),
         )
+    }
+    var pickedCover by remember { mutableStateOf<Uri?>(null) }
+    var removeCover by remember { mutableStateOf(false) }
+    val existingCover = existing?.coverImagePath
+        ?.takeIf { !removeCover && File(it).exists() }
+    val coverModel: Any = pickedCover ?: existingCover?.let { File(it) } ?: R.drawable.bg_trip_header
+    val hasCustomCover = pickedCover != null || existingCover != null
+    val pickCover = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            pickedCover = uri
+            removeCover = false
+        }
     }
     var error by remember { mutableStateOf<String?>(null) }
     var dateError by remember { mutableStateOf<String?>(null) }
@@ -155,12 +178,17 @@ fun TripEditorDialog(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
-                    .clip(RoundedCornerShape(18.dp)),
+                    .height(148.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable {
+                        pickCover.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
             ) {
-                Image(
-                    painter = painterResource(R.drawable.bg_trip_header),
-                    contentDescription = null,
+                AsyncImage(
+                    model = coverModel,
+                    contentDescription = "Cover photo",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.matchParentSize(),
                 )
@@ -181,6 +209,38 @@ fun TripEditorDialog(
                         .align(Alignment.BottomStart)
                         .padding(14.dp),
                 )
+                if (hasCustomCover) {
+                    IconButton(
+                        onClick = {
+                            pickedCover = null
+                            removeCover = true
+                        },
+                        modifier = Modifier.align(Alignment.TopEnd),
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Remove photo",
+                            tint = Color.White,
+                        )
+                    }
+                    Text(
+                        text = "Tap to change",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.92f),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(14.dp),
+                    )
+                } else {
+                    Text(
+                        text = "Tap to add a photo",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.92f),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(14.dp),
+                    )
+                }
             }
             OutlinedTextField(
                 value = name,
@@ -308,7 +368,17 @@ fun TripEditorDialog(
                         dateError = "End date must be on or after start"
                         return@PrimaryCoastalButton
                     }
-                    onSave(name, pickedPlace, budget, startDate, endDate) { result ->
+                    onSave(
+                        name,
+                        pickedPlace,
+                        budget,
+                        startDate,
+                        endDate,
+                        TripCoverSelection(
+                            pickedUri = pickedCover,
+                            removeExisting = removeCover && pickedCover == null,
+                        ),
+                    ) { result ->
                         when {
                             result == null -> onDismiss()
                             result.contains("date", ignoreCase = true) -> dateError = result

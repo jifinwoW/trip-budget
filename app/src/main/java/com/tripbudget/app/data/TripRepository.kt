@@ -74,6 +74,23 @@ class TripRepository(
         }
     }
 
+    suspend fun totalsFor(tripId: Long): TripTotals? {
+        val trip = tripDao.getById(tripId) ?: return null
+        val members = memberDao.getByTrip(tripId)
+        val contributions = contributionDao.listByTrip(tripId)
+        val expenses = expenseDao.listByTrip(tripId)
+        val expected = members.associate { it.id to (it.name to it.expectedContributionPaise) }
+        val paid = contributions
+            .groupBy { it.memberId }
+            .mapValues { (_, list) -> list.sumOf { it.amountPaise } }
+        return TripTotalsCalculator.calculate(
+            plannedBudgetPaise = trip.plannedBudgetPaise,
+            memberExpected = expected,
+            contributionsByMember = paid,
+            expenses = expenses.map { ExpenseAmount(it.amountPaise, it.paymentSource) },
+        )
+    }
+
     suspend fun insertTrip(trip: TripEntity): Long {
         val id = tripDao.insert(trip.copy(updatedAt = System.currentTimeMillis()))
         liveCloudPush?.onTripUpserted(id)

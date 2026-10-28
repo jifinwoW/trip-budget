@@ -10,6 +10,7 @@
 .cxx/
 *.apk
 *.aab
+*firebase-adminsdk*.json
 .tools/
 *.class
 scripts/*.class

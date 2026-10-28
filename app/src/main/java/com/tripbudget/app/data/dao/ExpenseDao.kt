@@ -30,6 +30,9 @@ interface ExpenseDao {
     )
     fun observeRecent(tripId: Long, limit: Int): Flow<List<ExpenseEntity>>
 
+    @Query("SELECT * FROM expenses WHERE tripId = :tripId")
+    suspend fun listByTrip(tripId: Long): List<ExpenseEntity>
+
     @Query("SELECT * FROM expenses")
     suspend fun getAll(): List<ExpenseEntity>
 

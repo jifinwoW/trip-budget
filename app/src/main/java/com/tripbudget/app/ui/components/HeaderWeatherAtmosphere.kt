@@ -163,6 +163,7 @@ fun HeaderWeatherAtmosphere(
         val animatedSceneRes = when (kind) {
             WeatherKind.SUNNY -> R.raw.header_weather_sunny
             WeatherKind.CLOUDY -> R.raw.header_weather_cloudy
+            WeatherKind.OVERCAST -> R.raw.header_weather_overcast
             WeatherKind.RAIN -> R.raw.header_weather_rain
             WeatherKind.STORM -> R.raw.storm
             WeatherKind.FOG -> R.raw.header_weather_fog
@@ -172,6 +173,7 @@ fun HeaderWeatherAtmosphere(
         val sceneRes = when (kind) {
             WeatherKind.SUNNY -> null
             WeatherKind.CLOUDY -> null
+            WeatherKind.OVERCAST -> null
             WeatherKind.FOG -> null
             WeatherKind.RAIN -> null
             WeatherKind.STORM -> null
@@ -212,7 +214,7 @@ fun HeaderWeatherAtmosphere(
                 )
                 // GIFs already include rain, lightning, and snow.
                 when (kind) {
-                    WeatherKind.SUNNY, WeatherKind.CLOUDY, WeatherKind.FOG,
+                    WeatherKind.SUNNY, WeatherKind.CLOUDY, WeatherKind.OVERCAST, WeatherKind.FOG,
                     WeatherKind.RAIN, WeatherKind.STORM, WeatherKind.SNOW,
                     WeatherKind.UNKNOWN, null -> Unit
                 }
@@ -228,7 +230,7 @@ fun HeaderWeatherAtmosphere(
                 drawRect(brush = Brush.verticalGradient(wash))
 
                 when (kind) {
-                    WeatherKind.SUNNY, WeatherKind.CLOUDY, WeatherKind.FOG,
+                    WeatherKind.SUNNY, WeatherKind.CLOUDY, WeatherKind.OVERCAST, WeatherKind.FOG,
                     WeatherKind.RAIN, WeatherKind.STORM, WeatherKind.SNOW -> Unit
                     WeatherKind.UNKNOWN, null -> {
                         // Soft default coastal mist only
@@ -309,7 +311,7 @@ fun headerWashColors(kind: WeatherKind?, isDark: Boolean): List<Color> {
     if (isDark) {
         return when (kind) {
             WeatherKind.SUNNY -> listOf(Color(0xFF1A2820), Color(0xFF12201E), Color(0xFF0E1A18))
-            WeatherKind.CLOUDY -> listOf(Color(0xFF1A2228), Color(0xFF141C22), Color(0xFF0E161C))
+            WeatherKind.CLOUDY, WeatherKind.OVERCAST -> listOf(Color(0xFF1A2228), Color(0xFF141C22), Color(0xFF0E161C))
             // Match frog-rain banner (moss / mist)
             WeatherKind.RAIN -> listOf(Color(0xFF1A2824), Color(0xFF14201E), Color(0xFF101818))
             WeatherKind.STORM -> listOf(Color(0xFF181428), Color(0xFF120E1E), Color(0xFF0C0A16))
@@ -320,7 +322,7 @@ fun headerWashColors(kind: WeatherKind?, isDark: Boolean): List<Color> {
     }
     return when (kind) {
         WeatherKind.SUNNY -> listOf(Color(0xFFBFE8F2), Color(0xFFE8F6FA), Color(0xFFF8FCFD))
-        WeatherKind.CLOUDY -> listOf(Color(0xFFC5D4DE), Color(0xFFDCE6EC), Color(0xFFEEF3F6))
+        WeatherKind.CLOUDY, WeatherKind.OVERCAST -> listOf(Color(0xFFC5D4DE), Color(0xFFDCE6EC), Color(0xFFEEF3F6))
         // Soft grey-green to blend under the rain illustration
         WeatherKind.RAIN -> listOf(Color(0xFF9BB0A8), Color(0xFFB8C8C0), Color(0xFFD0DCD4))
         WeatherKind.STORM -> listOf(Color(0xFF8FA0B4), Color(0xFFA8B4C4), Color(0xFFC8D0DC))

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -74,6 +75,7 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val headerWeather by viewModel.headerWeather.collectAsStateWithLifecycle()
     val cloud by viewModel.cloud.collectAsStateWithLifecycle()
+    val update by viewModel.update.collectAsStateWithLifecycle()
     // Open-Meteo label + temp (e.g. "Partly cloudy · 28°C"), not our simplified scene kind.
     val liveWeatherSubtitle = when {
         !hasLocationPermission -> "Location off"
@@ -197,6 +199,8 @@ fun SettingsScreen(
             EnterCascade(120) {
                 AboutSection(
                     hasAccount = !cloud.user?.email.isNullOrBlank(),
+                    update = update,
+                    onUpdate = viewModel::installUpdate,
                 )
             }
 
@@ -394,6 +398,8 @@ private fun AccountCard(
 @Composable
 private fun AboutSection(
     hasAccount: Boolean,
+    update: AppUpdateUiState,
+    onUpdate: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -437,7 +443,7 @@ private fun AboutSection(
                 )
             }
             Text(
-                "v1.0.0",
+                "v${update.versionName}",
                 style = MaterialTheme.typography.labelMedium,
                 color = Teal600,
                 modifier = Modifier
@@ -471,6 +477,76 @@ private fun AboutSection(
                 icon = if (hasAccount) Icons.Outlined.Cloud else Icons.Outlined.Lock,
                 label = if (hasAccount) "Online" else "Join OK",
                 modifier = Modifier.weight(1f),
+            )
+        }
+
+        if (update.availableName != null) {
+            val percent = update.progress?.let { (it * 100).toInt().coerceIn(0, 100) }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(CoastalTokens.tealSoft)
+                    .clickable(enabled = !update.busy, onClick = onUpdate)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    if (update.busy && percent == null) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = CoastalTokens.tealSoftFg,
+                        )
+                        Spacer(Modifier.size(10.dp))
+                    } else if (!update.busy) {
+                        Icon(
+                            Icons.Outlined.SystemUpdate,
+                            contentDescription = null,
+                            tint = CoastalTokens.tealSoftFg,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.size(8.dp))
+                    }
+                    Text(
+                        when {
+                            percent != null -> "Downloading $percent%"
+                            update.busy -> "Downloading…"
+                            else -> "Update to ${update.availableName}"
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = CoastalTokens.tealSoftFg,
+                    )
+                }
+                if (percent != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(CoastalTokens.tealSoftFg.copy(alpha = 0.28f)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(update.progress ?: 0f)
+                                .height(6.dp)
+                                .background(CoastalTokens.tealSoftFg),
+                        )
+                    }
+                }
+            }
+        }
+
+        update.message?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = CoastalTokens.accent,
             )
         }
     }

@@ -21,6 +21,7 @@ enum class HeaderWeatherPreference {
     LIVE,
     SUNNY,
     CLOUDY,
+    OVERCAST,
     FOG,
     RAIN,
     STORM,
@@ -31,6 +32,7 @@ enum class HeaderWeatherPreference {
         LIVE -> null
         SUNNY -> WeatherKind.SUNNY
         CLOUDY -> WeatherKind.CLOUDY
+        OVERCAST -> WeatherKind.OVERCAST
         FOG -> WeatherKind.FOG
         RAIN -> WeatherKind.RAIN
         STORM -> WeatherKind.STORM
@@ -41,6 +43,7 @@ enum class HeaderWeatherPreference {
         LIVE -> "Live weather"
         SUNNY -> "Sunny"
         CLOUDY -> "Cloudy"
+        OVERCAST -> "Overcast"
         FOG -> "Fog"
         RAIN -> "Rain"
         STORM -> "Storm"

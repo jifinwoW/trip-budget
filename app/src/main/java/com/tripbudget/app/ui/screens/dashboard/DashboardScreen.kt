@@ -47,8 +47,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -76,6 +79,7 @@ import com.tripbudget.app.ui.screens.members.ContributionEditorDialog
 import com.tripbudget.app.ui.theme.CoastalTokens
 import com.tripbudget.app.ui.theme.Teal600
 import com.tripbudget.app.ui.theme.floatingNavContentPadding
+import java.io.File
 import java.time.LocalDate
 
 @Composable
@@ -183,6 +187,7 @@ fun DashboardScreen(
                 tripName = trip.name,
                 dateRange = TripDates.formatRange(trip),
                 plannedBudgetPaise = totals.plannedBudgetPaise,
+                coverImagePath = trip.coverImagePath,
                 onEditBudget = onEditTrip,
                 showBudgetChip = false,
                 imageZoom = heroImageZoom,
@@ -490,7 +495,7 @@ fun DashboardScreen(
                 onClick = onOpenRoutePlan,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = floatingNavContentPadding() + 12.dp)
+                    .padding(bottom = floatingNavContentPadding() + 36.dp)
                     .zIndex(3f),
             )
         }
@@ -540,6 +545,7 @@ private fun TripScenicHeader(
     tripName: String,
     dateRange: String?,
     plannedBudgetPaise: Long,
+    coverImagePath: String?,
     onEditBudget: () -> Unit,
     modifier: Modifier = Modifier,
     showBudgetChip: Boolean = true,
@@ -554,18 +560,32 @@ private fun TripScenicHeader(
             .height(height)
             .clip(RoundedCornerShape(topStart = topCornerRadius, topEnd = topCornerRadius)),
     ) {
-        Image(
-            painter = painterResource(R.drawable.bg_trip_header),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .matchParentSize()
-                .graphicsLayer {
-                    scaleX = imageZoom
-                    scaleY = imageZoom
-                    translationY = imageOffsetY
-                },
-        )
+        val coverFile = coverImagePath?.let { File(it) }?.takeIf { it.exists() }
+        val imageModifier = Modifier
+            .matchParentSize()
+            .graphicsLayer {
+                scaleX = imageZoom
+                scaleY = imageZoom
+                translationY = imageOffsetY
+            }
+        if (coverFile != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(coverFile)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = imageModifier,
+            )
+        } else {
+            Image(
+                painter = painterResource(R.drawable.bg_trip_header),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = imageModifier,
+            )
+        }
         Box(
             modifier = Modifier
                 .matchParentSize()

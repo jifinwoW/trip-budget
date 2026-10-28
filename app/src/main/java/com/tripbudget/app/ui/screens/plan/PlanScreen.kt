@@ -88,6 +88,8 @@ import com.tripbudget.app.ui.components.ListShimmer
 import com.tripbudget.app.ui.components.LivePullRefresh
 import com.tripbudget.app.ui.theme.Teal600
 import com.tripbudget.app.ui.theme.floatingNavContentPadding
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,6 +121,14 @@ fun PlanScreen(
     }
 
     val tracking = state.trip?.routeTrackingActive == true
+    val startsOnLabel = state.trip?.startDateEpochDay?.let { epoch ->
+        val start = LocalDate.ofEpochDay(epoch)
+        if (LocalDate.now().isBefore(start)) {
+            start.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+        } else {
+            null
+        }
+    }
     val reachedCount = state.stops.count { it.status == RouteStopStatus.REACHED }
     val tripProximity = proximity?.takeIf { it.tripId == tripId }
     val fabBottomPad = if (onClose != null) 16.dp else floatingNavContentPadding()
@@ -181,6 +191,7 @@ fun PlanScreen(
                             ) {
                                 RouteTrackingHeader(
                                     tracking = tracking,
+                                    startsOnLabel = startsOnLabel,
                                     stopCount = state.stops.size,
                                     reachedCount = reachedCount,
                                     hasLocationPermission = hasLocationPermission,
@@ -301,6 +312,7 @@ fun PlanScreen(
 @Composable
 private fun RouteTrackingHeader(
     tracking: Boolean,
+    startsOnLabel: String?,
     stopCount: Int,
     reachedCount: Int,
     hasLocationPermission: Boolean,
@@ -323,7 +335,11 @@ private fun RouteTrackingHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = if (tracking) "Trip in progress" else "Ready when you are",
+                text = when {
+                    tracking -> "Trip in progress"
+                    startsOnLabel != null -> "Starts $startsOnLabel"
+                    else -> "Ready when you are"
+                },
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -369,6 +385,8 @@ private fun RouteTrackingHeader(
                         "Location is off — mark stops manually, or allow GPS."
                     tracking ->
                         "Getting your location…"
+                    startsOnLabel != null ->
+                        "GPS turns on by itself on $startsOnLabel."
                     else ->
                         "Start the trip — GPS marks stops when you’re nearby."
                 },

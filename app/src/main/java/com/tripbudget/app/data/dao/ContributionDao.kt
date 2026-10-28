@@ -29,6 +29,9 @@ interface ContributionDao {
     )
     fun observeByMember(memberId: Long): Flow<List<ContributionEntity>>
 
+    @Query("SELECT * FROM contributions WHERE tripId = :tripId")
+    suspend fun listByTrip(tripId: Long): List<ContributionEntity>
+
     @Query("SELECT * FROM contributions")
     suspend fun getAll(): List<ContributionEntity>
 

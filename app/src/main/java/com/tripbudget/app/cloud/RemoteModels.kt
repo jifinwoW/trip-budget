@@ -1,5 +1,6 @@
 package com.tripbudget.app.cloud
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -18,6 +19,9 @@ data class RemoteTrip(
     @SerialName("invite_code") val inviteCode: String,
     @SerialName("route_tracking_active") val routeTrackingActive: Boolean = false,
     @SerialName("updated_at") val updatedAt: String,
+    /** Object key in the uploads bucket. Omitted on write when unset so a sync cannot clear it. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @SerialName("cover_path") val coverPath: String? = null,
 )
 
 @Serializable

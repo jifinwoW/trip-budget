@@ -1,5 +1,6 @@
 package com.tripbudget.app.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -7,17 +8,21 @@ import com.tripbudget.app.cloud.AuthRepository
 import com.tripbudget.app.cloud.AuthUser
 import com.tripbudget.app.cloud.SyncEngine
 import com.tripbudget.app.cloud.friendlyCloudError
+import com.tripbudget.app.data.TripCoverStore
 import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.Money
 import com.tripbudget.app.places.TripPlace
+import com.tripbudget.app.ui.screens.trips.TripCoverSelection
 import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class TripSelectionUiState(
     val isLoading: Boolean = true,
@@ -32,6 +37,7 @@ data class TripSelectionUiState(
 )
 
 class TripSelectionViewModel(
+    private val appContext: Context,
     private val repository: TripRepository,
     private val syncEngine: SyncEngine,
     private val authRepository: AuthRepository,
@@ -106,6 +112,7 @@ class TripSelectionViewModel(
         budgetRupees: String,
         startDate: LocalDate,
         endDate: LocalDate,
+        cover: TripCoverSelection,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
@@ -123,6 +130,11 @@ class TripSelectionViewModel(
                 onResult("Enter a valid budget amount")
                 return@launch
             }
+            val coverPath = resolveCover(existingPath = null, cover = cover)
+            if (coverPath.isFailure) {
+                onResult("Couldn't use that photo. Try another.")
+                return@launch
+            }
             val id = repository.insertTrip(
                 TripEntity(
                     name = trimmedName,
@@ -133,6 +145,7 @@ class TripSelectionViewModel(
                     startDateEpochDay = startDate.toEpochDay(),
                     endDateEpochDay = endDate.toEpochDay(),
                     remoteOwnerId = authRepository.currentUserIdOrNull(),
+                    coverImagePath = coverPath.getOrNull(),
                 ),
             )
             selectedTripId.value = id
@@ -147,6 +160,7 @@ class TripSelectionViewModel(
         budgetRupees: String,
         startDate: LocalDate,
         endDate: LocalDate,
+        cover: TripCoverSelection,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
@@ -164,6 +178,11 @@ class TripSelectionViewModel(
                 onResult("Enter a valid budget amount")
                 return@launch
             }
+            val coverPath = resolveCover(existingPath = trip.coverImagePath, cover = cover)
+            if (coverPath.isFailure) {
+                onResult("Couldn't use that photo. Try another.")
+                return@launch
+            }
             repository.updateTrip(
                 trip.copy(
                     name = trimmedName,
@@ -173,6 +192,8 @@ class TripSelectionViewModel(
                     plannedBudgetPaise = paise,
                     startDateEpochDay = startDate.toEpochDay(),
                     endDateEpochDay = endDate.toEpochDay(),
+                    coverImagePath = coverPath.getOrNull(),
+                    coverObjectKey = if (cover.pickedUri != null) null else trip.coverObjectKey,
                 ),
             )
             onResult(null)
@@ -185,11 +206,28 @@ class TripSelectionViewModel(
                 onDone()
                 return@launch
             }
+            TripCoverStore.delete(trip.coverImagePath)
             repository.deleteTrip(trip)
             if (selectedTripId.value == trip.id) {
                 selectedTripId.value = null
             }
             onDone()
+        }
+    }
+
+    fun sendMemberNotification(
+        trip: TripEntity,
+        title: String,
+        message: String,
+        onResult: (String?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val result = syncEngine.sendAnnouncement(trip.id, title, message)
+            onResult(
+                result.exceptionOrNull()?.let { err ->
+                    friendlyCloudError(err, "Couldn't send that notification. Try again.")
+                },
+            )
         }
     }
 
@@ -224,6 +262,27 @@ class TripSelectionViewModel(
         }
     }
 
+    private suspend fun resolveCover(
+        existingPath: String?,
+        cover: TripCoverSelection,
+    ): Result<String?> = withContext(Dispatchers.IO) {
+        runCatching {
+            when {
+                cover.pickedUri != null -> {
+                    val saved = TripCoverStore.save(appContext, cover.pickedUri)
+                        ?: error("unreadable")
+                    if (saved != existingPath) TripCoverStore.delete(existingPath)
+                    saved
+                }
+                cover.removeExisting -> {
+                    TripCoverStore.delete(existingPath)
+                    null
+                }
+                else -> existingPath
+            }
+        }
+    }
+
     companion object {
         fun isOwnedBy(trip: TripEntity, userId: String?): Boolean {
             if (userId.isNullOrBlank()) return false
@@ -238,6 +297,7 @@ class TripSelectionViewModel(
         }
 
         fun factory(
+            context: Context,
             repository: TripRepository,
             syncEngine: SyncEngine,
             authRepository: AuthRepository,
@@ -245,7 +305,12 @@ class TripSelectionViewModel(
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return TripSelectionViewModel(repository, syncEngine, authRepository) as T
+                    return TripSelectionViewModel(
+                        context.applicationContext,
+                        repository,
+                        syncEngine,
+                        authRepository,
+                    ) as T
                 }
             }
     }

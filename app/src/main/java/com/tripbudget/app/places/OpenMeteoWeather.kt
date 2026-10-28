@@ -11,6 +11,7 @@ import java.net.URL
 enum class WeatherKind {
     SUNNY,
     CLOUDY,
+    OVERCAST,
     RAIN,
     STORM,
     SNOW,
@@ -121,8 +122,9 @@ object OpenMeteoWeather {
         WeatherKind.CLOUDY -> when (code) {
             1 -> "Partly cloudy"
             2 -> "Cloudy"
-            else -> "Overcast"
+            else -> "Cloudy"
         }
+        WeatherKind.OVERCAST -> "Overcast"
         WeatherKind.RAIN -> when (code) {
             51, 56, 61, 66, 80 -> "Light rain"
             55, 57, 65, 67, 82 -> "Heavy rain"

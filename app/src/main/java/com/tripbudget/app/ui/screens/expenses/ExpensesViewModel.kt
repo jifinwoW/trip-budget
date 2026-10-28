@@ -82,6 +82,7 @@ class ExpensesViewModel(
                 paidByMemberId = if (paymentSource == PaymentSource.PERSONAL) paidByMemberId else null,
                 paymentSource = paymentSource,
                 notes = notes?.trim()?.takeIf { it.isNotEmpty() },
+                remoteId = existing?.remoteId,
             )
             if (existing == null) {
                 repository.insertExpense(entity)
