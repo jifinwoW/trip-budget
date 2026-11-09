@@ -34,6 +34,7 @@ import io.ktor.http.ContentType
 import java.io.File
 import java.util.UUID
 import kotlin.random.Random
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -59,13 +60,20 @@ class SyncEngine(
     private val syncPreferences: SyncPreferences,
     private val showNotification: (title: String, body: String, evenInForeground: Boolean, tag: String) -> Unit,
 ) : LiveCloudPush {
-    private val liveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val liveScope = CoroutineScope(
+        SupervisorJob() +
+            Dispatchers.IO +
+            CoroutineExceptionHandler { _, err ->
+                Log.w(TAG, "Live sync failed", err)
+            },
+    )
     private val refreshMutex = Mutex()
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     private var realtimeChannel: RealtimeChannel? = null
     private var realtimeJob: Job? = null
+    private var realtimeUserId: String? = null
     private var debouncedPullJob: Job? = null
     private var lastRefreshAtMs: Long = 0L
     private var muteNotificationsUntilMs: Long = 0L
@@ -135,10 +143,12 @@ class SyncEngine(
     }
 
     /** Subscribe to Postgres changes; any remote edit triggers a live pull. */
-    fun startRealtime() {
-        val supabase = client ?: return
-        val userId = authRepository.currentUserIdOrNull() ?: return
+    fun startRealtime(): Boolean {
+        val supabase = client ?: return false
+        val userId = authRepository.currentUserIdOrNull() ?: return false
+        if (realtimeJob?.isActive == true && realtimeUserId == userId) return false
         stopRealtime()
+        realtimeUserId = userId
         realtimeJob = liveScope.launch {
             runCatching {
                 val channel = supabase.channel("trip-live-$userId")
@@ -166,24 +176,27 @@ class SyncEngine(
                 Log.w(TAG, "Realtime subscribe failed", err)
             }
         }
+        return true
     }
 
     fun stopRealtime() {
         debouncedPullJob?.cancel()
         debouncedPullJob = null
-        realtimeJob?.cancel()
+        realtimeUserId = null
+        val job = realtimeJob
         realtimeJob = null
         val channel = realtimeChannel
         realtimeChannel = null
-        if (channel != null) {
-            liveScope.launch {
-                runCatching {
+        liveScope.launch {
+            runCatching {
+                if (channel != null) {
                     channel.unsubscribe()
                     client?.realtime?.removeChannel(channel)
-                }.onFailure { err ->
-                    Log.w(TAG, "Realtime unsubscribe failed", err)
                 }
+            }.onFailure { err ->
+                Log.w(TAG, "Realtime unsubscribe failed", err)
             }
+            runCatching { job?.cancel() }
         }
     }
 

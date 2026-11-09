@@ -94,8 +94,9 @@ class TripSelectionViewModel(
     }
 
     fun startLiveSync() {
-        syncEngine.startRealtime()
-        syncEngine.requestRefresh(force = true)
+        if (syncEngine.startRealtime()) {
+            syncEngine.requestRefresh(force = true)
+        }
     }
 
     fun stopLiveSync() {

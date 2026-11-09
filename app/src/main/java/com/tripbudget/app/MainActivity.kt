@@ -82,7 +82,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        (application as TripBudgetApp).container.routeArrivalTracker.stop()
+        if (!isChangingConfigurations) {
+            (application as TripBudgetApp).container.routeArrivalTracker.stop()
+        }
         super.onDestroy()
     }
 }
