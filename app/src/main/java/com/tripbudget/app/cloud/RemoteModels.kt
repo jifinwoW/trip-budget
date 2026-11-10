@@ -88,3 +88,14 @@ data class RemoteExpense(
     val notes: String? = null,
     @SerialName("updated_at") val updatedAt: String,
 )
+
+@Serializable
+data class RemotePlannedExpense(
+    val id: String,
+    @SerialName("trip_id") val tripId: String,
+    val title: String,
+    @SerialName("amount_paise") val amountPaise: Long,
+    val category: String,
+    val notes: String? = null,
+    @SerialName("updated_at") val updatedAt: String,
+)

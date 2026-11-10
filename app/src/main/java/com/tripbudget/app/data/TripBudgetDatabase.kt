@@ -8,11 +8,13 @@ import androidx.room.TypeConverters
 import com.tripbudget.app.data.dao.ContributionDao
 import com.tripbudget.app.data.dao.ExpenseDao
 import com.tripbudget.app.data.dao.MemberDao
+import com.tripbudget.app.data.dao.PlannedExpenseDao
 import com.tripbudget.app.data.dao.RouteStopDao
 import com.tripbudget.app.data.dao.TripDao
 import com.tripbudget.app.data.entity.ContributionEntity
 import com.tripbudget.app.data.entity.ExpenseEntity
 import com.tripbudget.app.data.entity.MemberEntity
+import com.tripbudget.app.data.entity.PlannedExpenseEntity
 import com.tripbudget.app.data.entity.RouteStopEntity
 import com.tripbudget.app.data.entity.TripEntity
 
@@ -23,8 +25,9 @@ import com.tripbudget.app.data.entity.TripEntity
         ContributionEntity::class,
         ExpenseEntity::class,
         RouteStopEntity::class,
+        PlannedExpenseEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -34,6 +37,7 @@ abstract class TripBudgetDatabase : RoomDatabase() {
     abstract fun contributionDao(): ContributionDao
     abstract fun expenseDao(): ExpenseDao
     abstract fun routeStopDao(): RouteStopDao
+    abstract fun plannedExpenseDao(): PlannedExpenseDao
 
     companion object {
         fun create(context: Context): TripBudgetDatabase {
@@ -51,6 +55,7 @@ abstract class TripBudgetDatabase : RoomDatabase() {
                     Migrations.MIGRATION_6_7,
                     Migrations.MIGRATION_7_8,
                     Migrations.MIGRATION_8_9,
+                    Migrations.MIGRATION_9_10,
                 )
                 // Do not use fallbackToDestructiveMigration — that erases user data.
                 .build()

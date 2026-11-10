@@ -162,4 +162,31 @@ object Migrations {
             db.execSQL("ALTER TABLE `trips` ADD COLUMN `coverObjectKey` TEXT")
         }
     }
+
+    /** v9 → v10: planned expenses for budget planning. */
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `planned_expenses` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `tripId` INTEGER NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `amountPaise` INTEGER NOT NULL,
+                    `category` TEXT NOT NULL,
+                    `notes` TEXT,
+                    `remoteId` TEXT,
+                    `updatedAt` INTEGER NOT NULL,
+                    FOREIGN KEY(`tripId`) REFERENCES `trips`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_planned_expenses_tripId` ON `planned_expenses` (`tripId`)",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_planned_expenses_remoteId` ON `planned_expenses` (`remoteId`)",
+            )
+        }
+    }
 }

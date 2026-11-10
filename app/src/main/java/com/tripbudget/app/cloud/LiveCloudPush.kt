@@ -19,4 +19,7 @@ interface LiveCloudPush {
 
     fun onRouteStopUpserted(localId: Long)
     fun onRouteStopDeleted(remoteId: String?)
+
+    fun onPlannedExpenseUpserted(localId: Long)
+    fun onPlannedExpenseDeleted(remoteId: String?)
 }

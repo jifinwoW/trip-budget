@@ -8,6 +8,7 @@ import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.ContributionEntity
 import com.tripbudget.app.data.entity.ExpenseEntity
 import com.tripbudget.app.data.entity.MemberEntity
+import com.tripbudget.app.data.entity.PlannedExpenseEntity
 import com.tripbudget.app.data.entity.RouteStopEntity
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.ExpenseCategory
@@ -92,6 +93,7 @@ class SyncEngine(
         pushContributions(supabase)
         pushExpenses(supabase)
         pushRouteStops(supabase)
+        pushPlannedExpenses(supabase)
 
         // Pull every trip this user can access (owned + joined).
         pullAll(supabase)
@@ -216,6 +218,7 @@ class SyncEngine(
         pullContributions(supabase)
         pullExpenses(supabase)
         pullRouteStops(supabase)
+        pullPlannedExpenses(supabase)
         reportNewJoins(supabase)
     }
 
@@ -628,6 +631,67 @@ class SyncEngine(
         repository.deleteSyncedRouteStopsNotIn(remotes.map { it.id })
     }
 
+    private suspend fun pushPlannedExpenses(supabase: SupabaseClient) {
+        runCatching {
+            val tripsByLocalId = repository.getAllTrips().associateBy { it.id }
+            val locals = repository.getAllPlannedExpenses()
+            val payloads = mutableListOf<RemotePlannedExpense>()
+            for (row in locals) {
+                val tripRemote = tripsByLocalId[row.tripId]?.remoteId ?: continue
+                val remoteId = row.remoteId ?: UUID.randomUUID().toString()
+                val updated = row.copy(remoteId = remoteId)
+                if (row.remoteId == null) {
+                    repository.putPlannedExpenseSynced(updated)
+                }
+                payloads += RemotePlannedExpense(
+                    id = remoteId,
+                    tripId = tripRemote,
+                    title = updated.title,
+                    amountPaise = updated.amountPaise,
+                    category = updated.category.name,
+                    notes = updated.notes,
+                    updatedAt = CloudTime.toIso(updated.updatedAt),
+                )
+            }
+            if (payloads.isNotEmpty()) {
+                supabase.from("planned_expenses").upsert(payloads)
+            }
+        }.onFailure { err ->
+            Log.w(TAG, "pushPlannedExpenses skipped or failed (remote table may not exist yet)", err)
+        }
+    }
+
+    private suspend fun pullPlannedExpenses(supabase: SupabaseClient) {
+        runCatching {
+            val remotes = supabase.from("planned_expenses").select().decodeList<RemotePlannedExpense>()
+            val tripsByRemote = repository.getAllTrips().mapNotNull { t ->
+                t.remoteId?.let { it to t }
+            }.toMap()
+            for (remote in remotes) {
+                val trip = tripsByRemote[remote.tripId] ?: continue
+                val remoteUpdated = CloudTime.fromIso(remote.updatedAt)
+                val existing = repository.getPlannedExpenseByRemoteId(remote.id)
+                if (existing != null && existing.updatedAt > remoteUpdated) continue
+                val category = runCatching { ExpenseCategory.valueOf(remote.category) }
+                    .getOrDefault(ExpenseCategory.OTHER)
+                val entity = PlannedExpenseEntity(
+                    id = existing?.id ?: 0,
+                    tripId = trip.id,
+                    title = remote.title,
+                    amountPaise = remote.amountPaise,
+                    category = category,
+                    notes = remote.notes,
+                    remoteId = remote.id,
+                    updatedAt = remoteUpdated,
+                )
+                repository.putPlannedExpenseSynced(entity)
+            }
+            repository.deleteSyncedPlannedExpensesNotIn(remotes.map { it.id })
+        }.onFailure { err ->
+            Log.w(TAG, "pullPlannedExpenses skipped or failed (remote table may not exist yet)", err)
+        }
+    }
+
     // --- Live push after each local write (when signed in) ---
 
     /** Saves this device's Firebase token so a later sender can reach it. */
@@ -966,6 +1030,12 @@ class SyncEngine(
     override fun onRouteStopDeleted(remoteId: String?) =
         liveLaunch(muteNotifications = false) { deleteRemoteRow("route_stops", remoteId) }
 
+    override fun onPlannedExpenseUpserted(localId: Long) =
+        liveLaunch { upsertPlannedExpense(localId) }
+
+    override fun onPlannedExpenseDeleted(remoteId: String?) =
+        liveLaunch { deleteRemoteRow("planned_expenses", remoteId) }
+
     private fun liveLaunch(muteNotifications: Boolean = true, block: suspend () -> Unit) {
         if (muteNotifications) {
             muteNotificationsUntilMs = System.currentTimeMillis() + SELF_NOTIFY_MUTE_MS
@@ -1124,6 +1194,32 @@ class SyncEngine(
                 updatedAt = CloudTime.toIso(latest.updatedAt),
             ),
         )
+    }
+
+    private suspend fun upsertPlannedExpense(localId: Long) {
+        runCatching {
+            val (supabase, _) = requireClientAndOwner() ?: return
+            val row = repository.getPlannedExpense(localId) ?: return
+            val tripRemote = ensureTripRemoteId(row.tripId) ?: return
+            val remoteId = row.remoteId ?: UUID.randomUUID().toString()
+            if (row.remoteId == null) {
+                repository.putPlannedExpenseSynced(row.copy(remoteId = remoteId))
+            }
+            val latest = repository.getPlannedExpense(localId) ?: return
+            supabase.from("planned_expenses").upsert(
+                RemotePlannedExpense(
+                    id = remoteId,
+                    tripId = tripRemote,
+                    title = latest.title,
+                    amountPaise = latest.amountPaise,
+                    category = latest.category.name,
+                    notes = latest.notes,
+                    updatedAt = CloudTime.toIso(latest.updatedAt),
+                ),
+            )
+        }.onFailure { err ->
+            Log.w(TAG, "upsertPlannedExpense failed (remote table may not exist yet)", err)
+        }
     }
 
     private fun coverObjectKeyFor(remoteId: String) = "$remoteId/cover.jpg"

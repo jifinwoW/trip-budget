@@ -4,6 +4,7 @@ import com.tripbudget.app.cloud.LiveCloudPush
 import com.tripbudget.app.data.entity.ContributionEntity
 import com.tripbudget.app.data.entity.ExpenseEntity
 import com.tripbudget.app.data.entity.MemberEntity
+import com.tripbudget.app.data.entity.PlannedExpenseEntity
 import com.tripbudget.app.data.entity.RouteStopEntity
 import com.tripbudget.app.data.entity.TripEntity
 import com.tripbudget.app.domain.ExpenseAmount
@@ -26,6 +27,7 @@ class TripRepository(
     private val contributionDao = db.contributionDao()
     private val expenseDao = db.expenseDao()
     private val routeStopDao = db.routeStopDao()
+    private val plannedExpenseDao = db.plannedExpenseDao()
     private val clearMutex = Mutex()
 
     /** Set from AppContainer after SyncEngine is created (avoids construct-time cycles). */
@@ -50,6 +52,9 @@ class TripRepository(
 
     fun observeRouteStops(tripId: Long): Flow<List<RouteStopEntity>> =
         routeStopDao.observeByTrip(tripId)
+
+    fun observePlannedExpenses(tripId: Long): Flow<List<PlannedExpenseEntity>> =
+        plannedExpenseDao.observeByTrip(tripId)
 
     fun observeTripTotals(tripId: Long): Flow<TripTotals?> {
         return combine(
@@ -176,6 +181,23 @@ class TripRepository(
         liveCloudPush?.onRouteStopDeleted(remoteId)
     }
 
+    suspend fun insertPlannedExpense(planned: PlannedExpenseEntity): Long {
+        val id = plannedExpenseDao.insert(planned.copy(updatedAt = System.currentTimeMillis()))
+        liveCloudPush?.onPlannedExpenseUpserted(id)
+        return id
+    }
+
+    suspend fun updatePlannedExpense(planned: PlannedExpenseEntity) {
+        plannedExpenseDao.update(planned.copy(updatedAt = System.currentTimeMillis()))
+        liveCloudPush?.onPlannedExpenseUpserted(planned.id)
+    }
+
+    suspend fun deletePlannedExpense(planned: PlannedExpenseEntity) {
+        val remoteId = planned.remoteId
+        plannedExpenseDao.delete(planned)
+        liveCloudPush?.onPlannedExpenseDeleted(remoteId)
+    }
+
     suspend fun addRouteStopFromPlace(
         tripId: Long,
         title: String,
@@ -298,6 +320,16 @@ class TripRepository(
     suspend fun getRouteStopsForTrip(tripId: Long): List<RouteStopEntity> =
         routeStopDao.getByTrip(tripId)
 
+    suspend fun getAllPlannedExpenses(): List<PlannedExpenseEntity> = plannedExpenseDao.getAll()
+
+    suspend fun getPlannedExpense(id: Long): PlannedExpenseEntity? = plannedExpenseDao.getById(id)
+
+    suspend fun getPlannedExpenseByRemoteId(remoteId: String): PlannedExpenseEntity? =
+        plannedExpenseDao.getByRemoteId(remoteId)
+
+    suspend fun getPlannedExpensesForTrip(tripId: Long): List<PlannedExpenseEntity> =
+        plannedExpenseDao.listByTrip(tripId)
+
     /** Trips currently running GPS route tracking. */
     suspend fun getTripsWithRouteTracking(): List<TripEntity> =
         tripDao.getAll().filter { it.routeTrackingActive }
@@ -354,6 +386,15 @@ class TripRepository(
         }
     }
 
+    suspend fun putPlannedExpenseSynced(planned: PlannedExpenseEntity): Long {
+        return if (planned.id == 0L) {
+            plannedExpenseDao.insert(planned)
+        } else {
+            plannedExpenseDao.update(planned)
+            planned.id
+        }
+    }
+
     suspend fun deleteSyncedTripsNotIn(keepRemoteIds: Collection<String>) {
         if (keepRemoteIds.isEmpty()) {
             tripDao.deleteAllSynced()
@@ -391,6 +432,14 @@ class TripRepository(
             routeStopDao.deleteAllSynced()
         } else {
             routeStopDao.deleteSyncedNotIn(keepRemoteIds.toList())
+        }
+    }
+
+    suspend fun deleteSyncedPlannedExpensesNotIn(keepRemoteIds: Collection<String>) {
+        if (keepRemoteIds.isEmpty()) {
+            plannedExpenseDao.deleteAllSynced()
+        } else {
+            plannedExpenseDao.deleteSyncedNotIn(keepRemoteIds.toList())
         }
     }
 

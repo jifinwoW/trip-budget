@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tripbudget.app.data.TripRepository
 import com.tripbudget.app.data.entity.ExpenseEntity
 import com.tripbudget.app.data.entity.MemberEntity
+import com.tripbudget.app.data.entity.PlannedExpenseEntity
 import com.tripbudget.app.domain.ExpenseCategory
 import com.tripbudget.app.domain.Money
 import com.tripbudget.app.domain.PaymentSource
@@ -21,6 +22,8 @@ data class ExpensesUiState(
     val tripId: Long? = null,
     val expenses: List<ExpenseEntity> = emptyList(),
     val members: List<MemberEntity> = emptyList(),
+    val plannedExpenses: List<PlannedExpenseEntity> = emptyList(),
+    val tripPlannedBudgetPaise: Long = 0L,
 )
 
 class ExpensesViewModel(
@@ -35,12 +38,16 @@ class ExpensesViewModel(
         combine(
             repository.observeExpenses(tripId),
             repository.observeMembers(tripId),
-        ) { expenses, members ->
+            repository.observePlannedExpenses(tripId),
+            repository.observeTrip(tripId),
+        ) { expenses, members, planned, trip ->
             ExpensesUiState(
                 isLoading = false,
                 tripId = tripId,
                 expenses = expenses,
                 members = members,
+                plannedExpenses = planned,
+                tripPlannedBudgetPaise = trip?.plannedBudgetPaise ?: 0L,
             )
         }
     }
@@ -96,6 +103,57 @@ class ExpensesViewModel(
     fun deleteExpense(expense: ExpenseEntity) {
         viewModelScope.launch {
             repository.deleteExpense(expense)
+        }
+    }
+
+    fun savePlannedExpense(
+        existing: PlannedExpenseEntity?,
+        tripId: Long,
+        title: String,
+        amountRupees: String,
+        category: ExpenseCategory,
+        notes: String?,
+        onResult: (String?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val trimmed = title.trim()
+            if (trimmed.isEmpty()) {
+                onResult("Title is required")
+                return@launch
+            }
+            val paise = Money.rupeesToPaise(amountRupees)
+            if (paise == null || paise <= 0L) {
+                onResult("Enter a valid amount")
+                return@launch
+            }
+            val entity = PlannedExpenseEntity(
+                id = existing?.id ?: 0,
+                tripId = tripId,
+                title = trimmed,
+                amountPaise = paise,
+                category = category,
+                notes = notes?.trim()?.takeIf { it.isNotEmpty() },
+                remoteId = existing?.remoteId,
+            )
+            if (existing == null) {
+                repository.insertPlannedExpense(entity)
+            } else {
+                repository.updatePlannedExpense(entity)
+            }
+            onResult(null)
+        }
+    }
+
+    fun deletePlannedExpense(item: PlannedExpenseEntity) {
+        viewModelScope.launch {
+            repository.deletePlannedExpense(item)
+        }
+    }
+
+    fun syncTripBudgetWithPlannedTotal(tripId: Long, totalPlannedPaise: Long) {
+        viewModelScope.launch {
+            val trip = repository.getTrip(tripId) ?: return@launch
+            repository.updateTrip(trip.copy(plannedBudgetPaise = totalPlannedPaise))
         }
     }
 
